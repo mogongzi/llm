@@ -1,0 +1,4 @@
+# Dependencies and logs
+.venv
+node_modules/
+sse_logs/
