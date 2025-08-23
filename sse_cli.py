@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """
-LLM CLI with live Markdown rendering using Rich + abort support.
-- Streams SSE-like tokens from /invoke
-- Renders markdown live
-- Auto-scrolls during streaming and prints final output at end
-- Abort hotkeys / signals:
-    • Ctrl+C (SIGINT) — abort current request or exit when idle
-    • q / Q (pressed while streaming) — abort current request
-    • SIGTERM / SIGHUP / SIGQUIT — graceful abort (e.g., Terminal close)
-
-Note: Command+Q is handled by the macOS app (Terminal/iTerm) and is not
-forwarded to child processes. We can’t capture it reliably. This script
-catches the OS signals typically sent on app close and provides a
-single-key 'q' abort while streaming.
+LLM CLI with live Markdown rendering using the Rich library.
+- Streams Server-Sent Events (SSE-style) from a local /invoke endpoint
+- Renders incremental markdown in-place (Live) as content arrives
+- Shows model name as a simple separator line once known
+- Automatically scrolls in real-time and ensures cursor ends at bottom when finished
+- Supports aborting current stream with:
+    - Pressing 'q' during streaming
+    - Cmd+\\ (Mac) or Ctrl+\\ (others) signal
 
 Requirements:
     pip install rich requests
@@ -25,13 +20,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import select
 import signal
 import sys
 import termios
 import tty
 from contextlib import contextmanager
-from select import select
-from threading import Event
 from typing import Optional
 
 import requests
@@ -39,10 +33,8 @@ from requests.exceptions import RequestException
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
-from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.text import Text
-from rich.align import Align
 
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 
@@ -50,52 +42,46 @@ COLOR_PROMPT = "bold green"
 COLOR_MODEL = "cyan"
 
 console = Console()
-ABORT = Event()
+_abort = False
 
 
-# ---------- Signals & keyboard helpers ----------
-
-def _set_abort_handlers() -> None:
-    def handler(signum, frame):
-        ABORT.set()
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT):
-        try:
-            signal.signal(sig, handler)
-        except Exception:
-            pass  # not all signals exist on all platforms
-
-
+# ---------------- Key capture helpers ----------------
 @contextmanager
-def raw_key_capture(enabled: bool = True):
-    """Put stdin into raw mode so single-key presses (e.g., 'q') are readable.
-    Restores terminal settings on exit. No-op if stdin is not a TTY or disabled.
-    """
-    if not enabled or not sys.stdin.isatty():
+def raw_mode(file):
+    if not file.isatty():
         yield
         return
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
+    old_attrs = termios.tcgetattr(file.fileno())
     try:
-        tty.setcbreak(fd)  # cbreak = read per-char; does not disable Ctrl+C
+        tty.setcbreak(file.fileno())
         yield
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        termios.tcsetattr(file.fileno(), termios.TCSADRAIN, old_attrs)
 
 
-def _poll_abort_key(timeout: float = 0.0) -> bool:
-    """Return True if user pressed 'q'/'Q'. Non-blocking when timeout=0."""
+def check_for_q(timeout: float = 0.0) -> bool:
+    """Check stdin for 'q' keypress."""
     if not sys.stdin.isatty():
         return False
-    rlist, _, _ = select([sys.stdin], [], [], timeout)
+    rlist, _, _ = select.select([sys.stdin], [], [], timeout)
     if rlist:
         ch = os.read(sys.stdin.fileno(), 1)
         if ch in (b"q", b"Q"):
-            ABORT.set()
             return True
-    return ABORT.is_set()
+    return False
 
 
-# ---------- Request / streaming ----------
+# ---------------- Signal handlers ----------------
+def _signal_handler(sig, frame):
+    global _abort
+    _abort = True
+    console.print("\n[red]Aborted by signal[/red]")
+
+
+signal.signal(signal.SIGQUIT, _signal_handler)
+
+
+# ---------------- HTTP helpers ----------------
 def build_payload(user_input: str) -> dict:
     return {
         "anthropic_version": "bedrock-2023-05-31",
@@ -112,13 +98,7 @@ def _pretty_http_error(resp: requests.Response) -> None:
         msg = json.dumps(payload, indent=2)
     except Exception:
         msg = resp.text
-    console.print(Panel.fit(
-        Text.from_markup(
-            f"[bold red]HTTP {resp.status_code}[/bold red]\n\n{msg}"
-        ),
-        title="Request Failed",
-        border_style="red",
-    ))
+    console.print(f"[bold red]HTTP {resp.status_code}[/bold red]\n\n{msg}")
 
 
 def _event_iter_lines(resp: requests.Response):
@@ -131,8 +111,10 @@ def _event_iter_lines(resp: requests.Response):
             yield raw
 
 
+# ---------------- Streaming ----------------
 def stream_response(url: str, payload: dict) -> Optional[str]:
-    ABORT.clear()
+    global _abort
+    _abort = False
     try:
         with requests.post(url, json=payload, stream=True, timeout=60) as r:
             if not r.ok:
@@ -142,13 +124,11 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
             md_text = ""
             model_name: Optional[str] = None
 
-            renderable = Panel(Markdown(""), title="[dim]Awaiting tokens…[/dim]", border_style="blue")
-            with raw_key_capture(True), Live(renderable, console=console, refresh_per_second=24, transient=False, auto_refresh=True) as live:
+            with raw_mode(sys.stdin), Live(console=console, refresh_per_second=24, transient=False, auto_refresh=True) as live:
                 for data in _event_iter_lines(r):
-                    if ABORT.is_set() or _poll_abort_key(0):
-                        console.print("\n[bold red]⏹ Aborted[/bold red]")
+                    if _abort or check_for_q(0):
+                        console.print("\n[red]Aborted[/red]")
                         break
-
                     if data == "[DONE]":
                         break
                     try:
@@ -159,41 +139,32 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
                     etype = evt.get("type")
                     if etype == "message_start" and isinstance(evt.get("message"), dict):
                         model_name = evt["message"].get("model") or model_name
+                        if model_name:
+                            console.rule(f"[bold {COLOR_MODEL}]{model_name}")
 
                     if etype == "content_block_delta":
                         delta = evt.get("delta", {})
                         if delta.get("type") == "text_delta":
                             md_text += delta.get("text", "")
 
-                    title_txt = (f"[bold {COLOR_MODEL}]{model_name}[/bold {COLOR_MODEL}]" if model_name else "[dim]Streaming…[/dim]")
-
-                    renderable = Panel(
-                        Align.left(Markdown(md_text)),
-                        title=title_txt,
-                        border_style="cyan",
-                        expand=True,
-                    )
-                    live.update(renderable, refresh=True)
+                    live.update(Markdown(md_text), refresh=True)
 
                     if etype == "message_stop":
                         break
 
-            # Always finalize with the last known content and place cursor at bottom
-            if md_text:
-                console.print(Align.left(Markdown(md_text)))
+            if not _abort:
+                console.print(Markdown(md_text))
             return md_text
 
     except RequestException as e:
-        if not ABORT.is_set():
-            console.print(Panel.fit(str(e), title="[red]Network error[/red]", border_style="red"), justify="left")
+        console.print(f"[red]Network error[/red]: {e}")
         return None
 
 
-# ---------- UI Loop ----------
+# ---------------- Interactive loop ----------------
 def interactive_loop(url: str) -> None:
-    _set_abort_handlers()
-    console.rule("LLM CLI • Live Markdown (press [bold]q[/bold] to abort)")
-    console.print(Text("Type 'exit' or 'quit' to leave. Ctrl+C also exits when idle.", style="dim"))
+    console.rule("LLM CLI • Live Markdown")
+    console.print(Text("Type 'exit' or 'quit' to leave. Press 'q' during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
 
     while True:
         try:
