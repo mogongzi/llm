@@ -4,7 +4,7 @@ LLM CLI with live Markdown rendering using the Rich library.
 - Streams Server-Sent Events (SSE-style) from a local /invoke endpoint
 - Renders incremental markdown in-place (Live) as content arrives
 - Shows model name as a simple separator line once known
-- Automatically scrolls in real-time and ensures cursor ends at bottom when finished
+- Auto-scrolls in real-time (no overflow dots)
 - Supports aborting current stream with:
     - Pressing 'q' during streaming
     - Cmd+\\ (Mac) or Ctrl+\\ (others) signal
@@ -41,7 +41,7 @@ DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_PROMPT = "bold green"
 COLOR_MODEL = "cyan"
 
-console = Console()
+console = Console(force_terminal=True, force_interactive=True, highlight=False, soft_wrap=True)
 _abort = False
 
 
@@ -60,7 +60,6 @@ def raw_mode(file):
 
 
 def check_for_q(timeout: float = 0.0) -> bool:
-    """Check stdin for 'q' keypress."""
     if not sys.stdin.isatty():
         return False
     rlist, _, _ = select.select([sys.stdin], [], [], timeout)
@@ -124,7 +123,7 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
             md_text = ""
             model_name: Optional[str] = None
 
-            with raw_mode(sys.stdin), Live(console=console, refresh_per_second=24, transient=False, auto_refresh=True) as live:
+            with raw_mode(sys.stdin), Live(console=console, refresh_per_second=24, transient=False, auto_refresh=True, vertical_overflow="visible") as live:
                 for data in _event_iter_lines(r):
                     if _abort or check_for_q(0):
                         console.print("\n[red]Aborted[/red]")
