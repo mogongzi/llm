@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-LLM CLI with live Markdown rendering using the Rich library.
-- Streams Server-Sent Events (SSE-style) from a local /invoke endpoint
-- Renders incremental markdown in-place (Live) as content arrives
-- Shows model name as a simple separator line once known
-- Auto-scrolls in real-time (no overflow dots)
-- Supports aborting current stream with:
-    - Pressing 'q' during streaming
-    - Cmd+\\ (Mac) or Ctrl+\\ (others) signal
+LLM CLI — streaming with **block-buffered** Markdown
+- Streams tokens but prints ONLY completed blocks (paragraphs / fenced code)
+- Avoids mid-line ANSI slicing → no missing characters
+- Auto-scrolls naturally; keeps clean scrollback
+- One model-name rule; no extra separators
+- Abort: press 'q' (or Cmd+\\ / Ctrl+\\ for SIGQUIT)
 
 Requirements:
     pip install rich requests
@@ -20,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import select
 import signal
 import sys
@@ -32,20 +31,22 @@ import requests
 from requests.exceptions import RequestException
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.live import Live
 from rich.prompt import Prompt
 from rich.text import Text
 
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
-
 COLOR_PROMPT = "bold green"
 COLOR_MODEL = "cyan"
 
-console = Console(force_terminal=True, force_interactive=True, highlight=False, soft_wrap=True)
+console = Console(soft_wrap=True)
 _abort = False
 
+# Regex for fenced code start/end at beginning of a line
+OPEN_FENCE_RE = re.compile(r"(?m)^(?P<fence>`{3,}|~{3,})[ \t]*[^\n]*\n")
+# Closing fence must use same char (` or ~) with length >= opening
+CLOSE_FENCE_FMT = r"(?m)^(?:%s{3,})\s*$\n"
 
-# ---------------- Key capture helpers ----------------
+
 @contextmanager
 def raw_mode(file):
     if not file.isatty():
@@ -70,24 +71,11 @@ def check_for_q(timeout: float = 0.0) -> bool:
     return False
 
 
-# ---------------- Signal handlers ----------------
-def _signal_handler(sig, frame):
-    global _abort
-    _abort = True
-    console.print("\n[red]Aborted by signal[/red]")
-
-
-signal.signal(signal.SIGQUIT, _signal_handler)
-
-
-# ---------------- HTTP helpers ----------------
 def build_payload(user_input: str) -> dict:
     return {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 2048,
-        "messages": [
-            {"role": "user", "content": user_input}
-        ],
+        "messages": [{"role": "user", "content": user_input}],
     }
 
 
@@ -110,7 +98,11 @@ def _event_iter_lines(resp: requests.Response):
             yield raw
 
 
-# ---------------- Streaming ----------------
+def _flush(block: str) -> None:
+    if block:
+        console.print(Markdown(block))
+
+
 def stream_response(url: str, payload: dict) -> Optional[str]:
     global _abort
     _abort = False
@@ -120,10 +112,14 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
                 _pretty_http_error(r)
                 return None
 
-            md_text = ""
             model_name: Optional[str] = None
 
-            with raw_mode(sys.stdin), Live(console=console, refresh_per_second=24, transient=False, auto_refresh=True, vertical_overflow="visible") as live:
+            # Accumulate tokens here, but only print finished blocks
+            pending = ""
+            in_code = False
+            close_re: Optional[re.Pattern[str]] = None
+
+            with raw_mode(sys.stdin):
                 for data in _event_iter_lines(r):
                     if _abort or check_for_q(0):
                         console.print("\n[red]Aborted[/red]")
@@ -144,23 +140,74 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
                     if etype == "content_block_delta":
                         delta = evt.get("delta", {})
                         if delta.get("type") == "text_delta":
-                            md_text += delta.get("text", "")
+                            pending += delta.get("text", "")
 
-                    live.update(Markdown(md_text), refresh=True)
+                    # Try to flush completed blocks from 'pending'
+                    while True:
+                        if in_code:
+                            assert close_re is not None
+                            m = close_re.search(pending)
+                            if not m:
+                                break  # wait for the rest of the code block
+                            end = m.end()
+                            _flush(pending[:end])
+                            pending = pending[end:]
+                            in_code = False
+                            close_re = None
+                            # continue scanning for more blocks in pending
+                            continue
+                        else:
+                            # If we see a paragraph boundary before a fence, flush the paragraph
+                            para_idx = pending.find("\n\n")
+                            m_open = OPEN_FENCE_RE.search(pending)
+
+                            if para_idx != -1 and (m_open is None or para_idx < m_open.start()):
+                                end = para_idx + 2
+                                _flush(pending[:end])
+                                pending = pending[end:]
+                                continue
+
+                            # If we see a fence, possibly flush text before it, then enter code mode
+                            if m_open:
+                                start = m_open.start()
+                                if start > 0:
+                                    _flush(pending[:start])
+                                    pending = pending[start:]
+                                    # update indices relative to new pending
+                                    m_open = OPEN_FENCE_RE.match(pending)
+                                    assert m_open
+
+                                fence = m_open.group("fence")[0]  # '`' or '~'
+                                close_re = re.compile(CLOSE_FENCE_FMT % re.escape(fence))
+                                in_code = True
+                                # now check if the fence closes within current pending
+                                m_close = close_re.search(pending[m_open.end():])
+                                if m_close:
+                                    end = m_open.end() + m_close.end()
+                                    _flush(pending[:end])
+                                    pending = pending[end:]
+                                    in_code = False
+                                    close_re = None
+                                    continue
+                                else:
+                                    break  # need more text to finish the code block
+
+                            # No paragraph end, no fence start → wait for more
+                            break
 
                     if etype == "message_stop":
                         break
 
-            if not _abort:
-                console.print(Markdown(md_text))
-            return md_text
+            # Flush whatever remains (partial paragraph/last line)
+            if pending:
+                _flush(pending)
+            return None
 
     except RequestException as e:
         console.print(f"[red]Network error[/red]: {e}")
         return None
 
 
-# ---------------- Interactive loop ----------------
 def interactive_loop(url: str) -> None:
     console.rule("LLM CLI • Live Markdown")
     console.print(Text("Type 'exit' or 'quit' to leave. Press 'q' during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
@@ -183,7 +230,7 @@ def interactive_loop(url: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Stream LLM responses and render markdown live in the console.")
+    parser = argparse.ArgumentParser(description="Stream LLM responses and render Markdown by completed blocks.")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Inference endpoint (default: {DEFAULT_URL})")
     args = parser.parse_args(argv)
 
