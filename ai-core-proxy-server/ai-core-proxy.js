@@ -1,20 +1,81 @@
-// Node 18+ (uses built-in fetch). Save as oauth-proxy-v2.js
+// Node 18+ (uses built-in fetch). Save as ai-core-proxy.js
+require("dotenv").config();
 const express = require("express");
 const { Readable } = require("stream");
 const { Buffer } = require("buffer");
 
-const OAUTH_TOKEN_URL =
-  "https://1mjnm8bjbc0q82d3.authentication.eu12.hana.ondemand.com/oauth/token"; // e.g. https://auth.example.com/oauth/token
-const OAUTH_CLIENT_ID =
-  "sb-26a94bff-c4ed-4d73-b7f9-c6216d3a21e3!b1362961|xsuaa_std!b318061";
-const OAUTH_CLIENT_SECRET =
-  "81cd60f9-5e3c-4985-bf8c-8dd8f619c527$k4Vc1uGyuatFWWavB9MiJaVD8XzINgculKRFmXjiWpA=";
-const LLM_API_ENDPOINT =
-  "https://api.ai.intprod-eu12.eu-central-1.aws.ml.hana.ondemand.com/v2/inference/deployments/d69942a0cb0b7e3f/invoke-with-response-stream";
-const PORT = "8000";
-const HOST = "127.0.0.1";
+const {
+  OAUTH_TOKEN_URL, // e.g. https://auth.example.com/oauth/token
+  OAUTH_CLIENT_ID,
+  OAUTH_CLIENT_SECRET,
+  LLM_API_ENDPOINT,
+  HOST = "127.0.0.1",
+  PORT = "8000",
+} = process.env;
+
+// console.log(OAUTH_CLIENT_ID);
+// console.log(OAUTH_CLIENT_ID);
+// console.log(OAUTH_CLIENT_SECRET);
+// console.log(LLM_API_ENDPOINT);
 
 const app = express();
+
+const { randomUUID } = require("crypto");
+const fs = require("node:fs/promises");
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+function sseWrite(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
+app.get("/mock", async (req, res) => {
+  const filePath = req.query.file || "mock.dat";
+
+  // ⬇️ Random jitter between 20 and 100 ms
+  const jitter = () => 20 + Math.floor(Math.random() * (100 - 50 + 1));
+
+  // SSE headers
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  let body;
+  try {
+    body = await fs.readFile(filePath, "utf8");
+  } catch (e) {
+    res.status(404);
+    res.write(
+      `data: ${JSON.stringify({
+        error: "mock_file_not_found",
+        message: e?.message || String(e),
+        file: filePath,
+      })}\n\n`
+    );
+    return res.end();
+  }
+
+  body = body.replace(/\r\n/g, "\n").trim();
+
+  const frames = body.split(/\n\n+/);
+  let idx = 0;
+  let closed = false;
+  req.on("close", () => (closed = true));
+
+  const writeNext = () => {
+    if (closed) return;
+    if (idx >= frames.length) return res.end();
+
+    const chunk = frames[idx++];
+    if (chunk) res.write(chunk + "\n\n");
+
+    setTimeout(writeNext, jitter());
+  };
+
+  writeNext();
+});
 
 // ---- tiny raw-body helper (no body-parser needed)
 async function readBody(req) {
