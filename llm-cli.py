@@ -181,15 +181,15 @@ def to_mock_url(u: str) -> str:
 
 # ---------------- Client core ----------------
 
-def build_payload(user_input: str) -> dict:
+def build_payload(messages: List[dict]) -> dict:
     return {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 4096,
-        "messages": [{"role": "user", "content": user_input}],
+        "messages": messages,
     }
 
 
-def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock: bool = False, user_text: str = "") -> None:
+def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock: bool = False, user_text: str = "") -> str:
     """Stream SSE and render incrementally.
 
     When use_mock=True, perform a GET to an SSE /mock endpoint and pass the prompt via ?text=...
@@ -212,7 +212,7 @@ def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock
                 except Exception:
                     err = {"error": r.text}
                 console.print(f"[bold red]HTTP {r.status_code}[/bold red]\n\n{json.dumps(err, indent=2)}")
-                return
+                return ""
 
             for data in iter_sse_lines(r):
                 if data == "[DONE]":
@@ -240,6 +240,7 @@ def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock
         console.print(f"[red]Network error[/red]: {e}")
     finally:
         ms.update("".join(buf), final=True)
+    return "".join(buf)
 
 
 # ---------------- CLI / REPL ----------------
@@ -247,6 +248,9 @@ def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock
 def repl(url: str, live_window: int, *, use_mock: bool) -> int:
     console.rule("llm-cli • Streaming Markdown")
     console.print(Text("Type 'exit' or 'quit' to leave.", style="dim"))
+
+    # Minimal in-memory conversation history
+    history: List[dict] = []
 
     while True:
         try:
@@ -260,8 +264,18 @@ def repl(url: str, live_window: int, *, use_mock: bool) -> int:
             console.print("[dim]Bye![/dim]")
             return 0
 
-        payload = build_payload(user)
-        stream_and_render(url, payload, live_window=live_window, use_mock=use_mock, user_text=user)
+        # Conversation: append user message and send full history
+        history.append({"role": "user", "content": user})
+        payload = build_payload(history)
+        reply_text = stream_and_render(
+            url,
+            payload,
+            live_window=live_window,
+            use_mock=use_mock,
+            user_text=user,
+        )
+        # Append assistant reply to history
+        history.append({"role": "assistant", "content": reply_text})
 
 
 def main(argv: Optional[list[str]] = None) -> int:

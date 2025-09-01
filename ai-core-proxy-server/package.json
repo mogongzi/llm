@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "ai-core-proxy.js",
   "scripts": {
+    "start": "node ai-core-proxy.js",
+    "dev": "NODE_ENV=development node ai-core-proxy.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

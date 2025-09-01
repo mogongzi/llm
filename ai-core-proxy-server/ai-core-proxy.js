@@ -13,10 +13,10 @@ const {
   PORT = "8000",
 } = process.env;
 
-// console.log(OAUTH_CLIENT_ID);
-// console.log(OAUTH_CLIENT_ID);
-// console.log(OAUTH_CLIENT_SECRET);
-// console.log(LLM_API_ENDPOINT);
+console.log(OAUTH_TOKEN_URL);
+console.log(OAUTH_CLIENT_ID);
+console.log(OAUTH_CLIENT_SECRET);
+console.log(LLM_API_ENDPOINT);
 
 const app = express();
 
