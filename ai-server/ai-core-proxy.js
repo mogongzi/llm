@@ -5,7 +5,7 @@ const { Readable } = require("stream");
 const { Buffer } = require("buffer");
 
 const {
-  OAUTH_TOKEN_URL, // e.g. https://auth.example.com/oauth/token
+  OAUTH_TOKEN_URL,
   OAUTH_CLIENT_ID,
   OAUTH_CLIENT_SECRET,
   LLM_API_ENDPOINT,
@@ -13,22 +13,8 @@ const {
   PORT = "8000",
 } = process.env;
 
-console.log(OAUTH_TOKEN_URL);
-console.log(OAUTH_CLIENT_ID);
-console.log(OAUTH_CLIENT_SECRET);
-console.log(LLM_API_ENDPOINT);
-
 const app = express();
-
-const { randomUUID } = require("crypto");
 const fs = require("node:fs/promises");
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-function sseWrite(res, obj) {
-  res.write(`data: ${JSON.stringify(obj)}\n\n`);
-}
 
 app.get("/mock", async (req, res) => {
   const filePath = req.query.file || "mock.dat";
@@ -118,9 +104,6 @@ async function getToken() {
   return token;
 }
 
-// Health (optional)
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
-
 // === SINGLE ENDPOINT ===
 app.post("/invoke", async (req, res) => {
   try {
@@ -171,6 +154,6 @@ app.post("/invoke", async (req, res) => {
 
 app.listen(Number(PORT), HOST, () => {
   console.log(
-    `AI Core Serivce proxy listening at http://${HOST}:${PORT}/invoke`
+    `SAP AI Core Service proxy listening at http://${HOST}:${PORT}/invoke`
   );
 });

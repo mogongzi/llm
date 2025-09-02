@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import select
 import signal
 import sys
@@ -41,10 +40,7 @@ COLOR_MODEL = "cyan"
 console = Console(soft_wrap=True)
 _abort = False
 
-# Regex for fenced code start/end at beginning of a line
-OPEN_FENCE_RE = re.compile(r"(?m)^(?P<fence>`{3,}|~{3,})[ \t]*[^\n]*\n")
-# Closing fence must use same char (` or ~) with length >= opening
-CLOSE_FENCE_FMT = r"(?m)^(?:%s{3,})\s*$\n"
+from render.block_buffered import BlockBuffer
 
 
 @contextmanager
@@ -113,11 +109,7 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
                 return None
 
             model_name: Optional[str] = None
-
-            # Accumulate tokens here, but only print finished blocks
-            pending = ""
-            in_code = False
-            close_re: Optional[re.Pattern[str]] = None
+            buf = BlockBuffer()
 
             with raw_mode(sys.stdin):
                 for data in _event_iter_lines(r):
@@ -140,67 +132,17 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
                     if etype == "content_block_delta":
                         delta = evt.get("delta", {})
                         if delta.get("type") == "text_delta":
-                            pending += delta.get("text", "")
+                            for block in buf.feed(delta.get("text", "")):
+                                _flush(block)
 
                     # Try to flush completed blocks from 'pending'
-                    while True:
-                        if in_code:
-                            assert close_re is not None
-                            m = close_re.search(pending)
-                            if not m:
-                                break  # wait for the rest of the code block
-                            end = m.end()
-                            _flush(pending[:end])
-                            pending = pending[end:]
-                            in_code = False
-                            close_re = None
-                            # continue scanning for more blocks in pending
-                            continue
-                        else:
-                            # If we see a paragraph boundary before a fence, flush the paragraph
-                            para_idx = pending.find("\n\n")
-                            m_open = OPEN_FENCE_RE.search(pending)
-
-                            if para_idx != -1 and (m_open is None or para_idx < m_open.start()):
-                                end = para_idx + 2
-                                _flush(pending[:end])
-                                pending = pending[end:]
-                                continue
-
-                            # If we see a fence, possibly flush text before it, then enter code mode
-                            if m_open:
-                                start = m_open.start()
-                                if start > 0:
-                                    _flush(pending[:start])
-                                    pending = pending[start:]
-                                    # update indices relative to new pending
-                                    m_open = OPEN_FENCE_RE.match(pending)
-                                    assert m_open
-
-                                fence = m_open.group("fence")[0]  # '`' or '~'
-                                close_re = re.compile(CLOSE_FENCE_FMT % re.escape(fence))
-                                in_code = True
-                                # now check if the fence closes within current pending
-                                m_close = close_re.search(pending[m_open.end():])
-                                if m_close:
-                                    end = m_open.end() + m_close.end()
-                                    _flush(pending[:end])
-                                    pending = pending[end:]
-                                    in_code = False
-                                    close_re = None
-                                    continue
-                                else:
-                                    break  # need more text to finish the code block
-
-                            # No paragraph end, no fence start → wait for more
-                            break
-
                     if etype == "message_stop":
                         break
 
             # Flush whatever remains (partial paragraph/last line)
-            if pending:
-                _flush(pending)
+            rest = buf.flush_remaining()
+            if rest:
+                _flush(rest)
             return None
 
     except RequestException as e:
