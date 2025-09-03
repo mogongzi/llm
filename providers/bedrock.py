@@ -39,17 +39,17 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             evt: Dict = json.loads(data)
         except json.JSONDecodeError:
             continue
-        etype = evt.get("type")
-        if etype == "message_start" and isinstance(evt.get("message"), dict):
+        e_type = evt.get("type")
+        if e_type == "message_start" and isinstance(evt.get("message"), dict):
             model = evt["message"].get("model")
             if model:
                 yield ("model", model)
-        elif etype == "content_block_delta":
+        elif e_type == "content_block_delta":
             delta = evt.get("delta", {})
             if delta.get("type") == "text_delta":
                 text = delta.get("text", "")
                 if text:
                     yield ("text", text)
-        elif etype == "message_stop":
+        elif e_type == "message_stop":
             yield ("done", None)
             break

@@ -2,13 +2,13 @@
 Minimal SSE debug client
 
 Examples:
+  python -m debug.debug_cli --provider="bedrock" --http "hello world"
   python3 debug/debug_cli.py --http "hello world"
   python3 debug/debug_cli.py --provider azure --url http://127.0.0.1:8000/invoke "hi"
 """
 
 import sys
 import os
-import json
 import argparse
 import requests
 

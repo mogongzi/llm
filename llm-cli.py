@@ -7,7 +7,7 @@ Features
 - Stable Scroll back via a small live tail window (no duplicate frames / missing chars)
 - Model name printed once as a rule header
 - Natural auto-scrolling; output preserved after stream ends
-- Abort gracefully with 'q' during stream or Ctrl+C
+- Abort gracefully with 'Esc' during stream or Ctrl+C
 
 Requirements
     pip install rich requests
@@ -19,18 +19,15 @@ Notes
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import signal
-from dataclasses import dataclass
+import sys
+from contextlib import contextmanager
 from typing import Iterator, List, Optional
 from urllib.parse import urlparse, urlunparse
-
-import requests
 from requests.exceptions import RequestException
 from rich.console import Console
 from rich.text import Text
-
 from sse_client import iter_sse_lines
 from providers import get_provider
 from render.markdown_live import MarkdownStream
@@ -73,6 +70,60 @@ def to_mock_url(u: str) -> str:
     return urlunparse(p._replace(path=new_path, query=""))
 
 
+# ---------------- Input helpers ----------------
+
+@contextmanager
+def _raw_mode(file):
+    """Best-effort cbreak mode so single-key presses are readable without Enter.
+
+    No-ops on non-TTYs or platforms without termios/tty.
+    """
+    try:
+        import termios  # type: ignore
+        import tty  # type: ignore
+    except Exception:
+        # Unsupported platform or import error; proceed without raw mode
+        yield
+        return
+
+    try:
+        if not hasattr(file, "isatty") or not file.isatty():
+            yield
+            return
+        fd = file.fileno()
+        old_attrs = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            yield
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+    except Exception:
+        # Fallback if anything goes wrong
+        yield
+
+
+def _esc_pressed(timeout: float = 0.0) -> bool:
+    """Return True if ESC was pressed within timeout seconds.
+
+    Uses select+os.read in a non-blocking way; returns False on non-TTY or unsupported platforms.
+    """
+    try:
+        import select
+        import os as _os
+    except Exception:
+        return False
+    if not hasattr(sys.stdin, "isatty") or not sys.stdin.isatty():
+        return False
+    try:
+        rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+        if rlist:
+            ch = _os.read(sys.stdin.fileno(), 1)
+            return ch == b"\x1b"  # ESC
+    except Exception:
+        return False
+    return False
+
+
 # ---------------- Client core ----------------
 
 def stream_and_render(
@@ -82,8 +133,7 @@ def stream_and_render(
     mapper,
     live_window: int = 6,
     use_mock: bool = False,
-    user_text: str = "",
-    timeout: float = 60.0,
+    timeout: float = 30.0,
     mock_file: Optional[str] = None,
     show_rule: bool = True,
 ) -> str:
@@ -103,26 +153,28 @@ def stream_and_render(
         if use_mock and mock_file:
             params["file"] = mock_file
         method = "GET" if use_mock else "POST"
-        for kind, value in mapper(
-            iter_sse_lines(
-                url,
-                method=method,
-                json=(None if use_mock else payload),
-                params=(params or None),
-                timeout=timeout,
-            )
-        ):
-            if _ABORT:
-                break
-            if kind == "model":
-                model_name = value or model_name
-                if show_rule and model_name:
-                    console.rule(f"[bold {COLOR_MODEL}]{model_name}")
-            elif kind == "text":
-                buf.append(value or "")
-                ms.update("".join(buf), final=False)
-            elif kind == "done":
-                break
+        with _raw_mode(sys.stdin):
+            for kind, value in mapper(
+                iter_sse_lines(
+                    url,
+                    method=method,
+                    json=(None if use_mock else payload),
+                    params=(params or None),
+                    timeout=timeout,
+                )
+            ):
+                if _ABORT or _esc_pressed(0.0):
+                    _ABORT = True
+                    break
+                if kind == "model":
+                    model_name = value or model_name
+                    if show_rule and model_name:
+                        console.rule(f"[bold {COLOR_MODEL}]{model_name}")
+                elif kind == "text":
+                    buf.append(value or "")
+                    ms.update("".join(buf), final=False)
+                elif kind == "done":
+                    break
     except RequestException as e:
         console.print(f"[red]Network error[/red]: {e}")
     finally:
@@ -147,7 +199,7 @@ def repl(
     max_tokens: int,
 ) -> int:
     console.rule("llm-cli • Streaming Markdown")
-    console.print(Text("Type 'exit' or 'quit' to leave.", style="dim"))
+    console.print(Text("Type 'exit' or 'quit' to leave. Press Esc during stream, or Ctrl+C.", style="dim"))
 
     # Minimal in-memory conversation history
     history: List[dict] = []
@@ -173,7 +225,6 @@ def repl(
             mapper=provider.map_events,
             live_window=live_window,
             use_mock=use_mock,
-            user_text=user,
             timeout=timeout,
             mock_file=mock_file,
             show_rule=show_rule,
