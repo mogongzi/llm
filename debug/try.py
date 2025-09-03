@@ -5,7 +5,7 @@ LLM CLI — streaming with **block-buffered** Markdown (provider-aware)
 - Avoids mid-line ANSI slicing → no missing characters
 - Auto-scrolls naturally; keeps clean scroll back
 - One model-name rule; no extra separators
-- Abort: press 'q' (or Cmd+\\ / Ctrl+\\ for SIGQUIT)
+- Abort: press 'Esc' (or Cmd+\\ / Ctrl+\\ for SIGQUIT)
 
 Requirements:
     pip install rich requests
@@ -57,13 +57,13 @@ def raw_mode(file):
         termios.tcsetattr(file.fileno(), termios.TCSADRAIN, old_attrs)
 
 
-def check_for_q(timeout: float = 0.0) -> bool:
+def check_for_esc(timeout: float = 0.0) -> bool:
     if not sys.stdin.isatty():
         return False
     rlist, _, _ = select.select([sys.stdin], [], [], timeout)
     if rlist:
         ch = os.read(sys.stdin.fileno(), 1)
-        if ch in (b"q", b"Q"):
+        if ch == b"\x1b":  # ESC
             return True
     return False
 
@@ -143,8 +143,8 @@ def stream_response(url: str, provider, payload: dict) -> Optional[str]:
             def _iter_from_queue():
                 global _abort
                 while True:
-                    # non-blocking abort on 'q'
-                    if _abort or check_for_q(0.05):
+                    # non-blocking abort on Esc
+                    if _abort or check_for_esc(0.05):
                         _abort = True
                         stop.set()
                         try:
@@ -190,7 +190,7 @@ def stream_response(url: str, provider, payload: dict) -> Optional[str]:
 
 def interactive_loop(url: str, provider, model: Optional[str]) -> None:
     console.rule("LLM CLI • Live Markdown")
-    console.print(Text("Type 'exit' or 'quit' to leave. Press 'q' during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
+    console.print(Text("Type 'exit' or 'quit' to leave. Press Esc during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
 
     while True:
         try:

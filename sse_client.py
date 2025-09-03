@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, Iterator, Optional
+from typing import Dict, Iterator, Optional
 
 import requests
 
@@ -18,8 +18,8 @@ def iter_sse_lines(
 
     Strips the leading "data:" prefix when present and skips empty keep-alive lines.
     """
-    sess = session or requests.Session()
-    req = sess.get if method.upper() == "GET" else sess.post
+    sse_session = session or requests.Session()
+    req = sse_session.get if method.upper() == "GET" else sse_session.post
     with req(url, json=json, params=params, stream=True, timeout=timeout) as r:
         r.raise_for_status()
         for raw in r.iter_lines(decode_unicode=True):
