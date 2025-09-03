@@ -21,7 +21,7 @@ const fs = require("node:fs/promises");
 app.get("/mock", async (req, res) => {
   const filePath = req.query.file || "mock.dat";
 
-  // ⬇️ Random jitter between 20 and 100 ms
+  // Random jitter between 20 and 100 ms
   const jitter = () => 20 + Math.floor(Math.random() * (100 - 50 + 1));
 
   // SSE headers
