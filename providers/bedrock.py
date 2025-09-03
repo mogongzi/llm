@@ -10,10 +10,10 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done", value)
 def build_payload(
     messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, **_: dict
 ) -> dict:
-    """Construct Anthropic-style chat payload.
+    """Construct Bedrock/Anthropic-style chat payload.
 
     Notes:
-    - Do not include a 'model' key by default; many Anthropic endpoints select model via path/config.
+    - Do not include a 'model' key by default; many Bedrock endpoints select model via path/config.
     - Keep structure aligned with existing behavior for backward compatibility.
     """
     return {
@@ -24,7 +24,7 @@ def build_payload(
 
 
 def map_events(lines: Iterator[str]) -> Iterator[Event]:
-    """Map Anthropic-style JSON SSE frames to a simple event interface.
+    """Map Bedrock/Anthropic JSON SSE frames to a simple event interface.
 
     Emits:
     - ("model", model_name) on message_start

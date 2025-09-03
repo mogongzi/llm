@@ -1,4 +1,4 @@
-from providers.anthropic import map_events
+from providers.bedrock import map_events
 
 
 def test_map_events_basic_sequence():
@@ -16,4 +16,3 @@ def test_map_events_done_marker():
     frames = ["[DONE]"]
     events = list(map_events(iter(frames)))
     assert events == [("done", None)]
-

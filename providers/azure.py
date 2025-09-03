@@ -10,7 +10,7 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done", value)
 def build_payload(
     messages: List[dict], *, model: Optional[str] = None, max_tokens: Optional[int] = None, temperature: Optional[float] = None, **_: dict
 ) -> dict:
-    """Construct an OpenAI Chat Completions streaming payload.
+    """Construct an Azure/OpenAI Chat Completions streaming payload.
 
     Requires `model`. Includes `stream: true`.
     """
@@ -28,7 +28,7 @@ def build_payload(
 
 
 def map_events(lines: Iterator[str]) -> Iterator[Event]:
-    """Map OpenAI Chat Completions SSE chunks to unified events.
+    """Map Azure/OpenAI Chat Completions SSE chunks to unified events.
 
     Emits:
     - ("model", name) on first chunk carrying `model`

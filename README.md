@@ -31,7 +31,7 @@
 
 **CLIs**
 
-- `llm-cli.py`: live Markdown with stable scroll back, headings, and code blocks. Supports `--provider` (`anthropic` or `openai`).
+- `llm-cli.py`: live Markdown with stable scroll back, headings, and code blocks. Supports `--provider` (`bedrock` [Bedrock Anthropic] or `azure` [Azure OpenAI]).
 - `debug/try.py`: prints only completed blocks (paragraphs/fenced code); abort with `q`. Supports `--provider`.
 - `debug/debug_cli.py`: `--http` prints raw SSE lines; default prints plain text chunks. Supports `--provider`.
 

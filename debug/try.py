@@ -11,7 +11,7 @@ Requirements:
     pip install rich requests
 
 Usage:
-    python debug/try.py --url http://127.0.0.1:8000/invoke --provider anthropic
+    python debug/try.py --url http://127.0.0.1:8000/invoke --provider bedrock
 """
 from __future__ import annotations
 
@@ -212,7 +212,7 @@ def interactive_loop(url: str, provider, model: Optional[str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Stream LLM responses and render Markdown by completed blocks.")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Inference endpoint (default: {DEFAULT_URL})")
-    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use (default: anthropic)")
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "bedrock"), choices=["bedrock", "azure"], help="Provider adapter to use (default: bedrock)")
     parser.add_argument("--model", help="Optional model name to send to provider")
     args = parser.parse_args(argv)
 
