@@ -32,7 +32,7 @@ from rich.console import Console
 from rich.text import Text
 
 from sse_client import iter_sse_lines
-from providers.anthropic import map_events
+from providers import get_provider
 from render.markdown_live import MarkdownStream
 
 # ---------------- Configuration ----------------
@@ -75,15 +75,18 @@ def to_mock_url(u: str) -> str:
 
 # ---------------- Client core ----------------
 
-def build_payload(messages: List[dict]) -> dict:
-    return {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 4096,
-        "messages": messages,
-    }
-
-
-def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock: bool = False, user_text: str = "", timeout: float = 60.0, mock_file: Optional[str] = None, show_rule: bool = True) -> str:
+def stream_and_render(
+    url: str,
+    payload: dict,
+    *,
+    mapper,
+    live_window: int = 6,
+    use_mock: bool = False,
+    user_text: str = "",
+    timeout: float = 60.0,
+    mock_file: Optional[str] = None,
+    show_rule: bool = True,
+) -> str:
     """Stream SSE and render incrementally.
 
     When use_mock=True, perform a GET to an SSE /mock endpoint and pass the prompt via ?text=...
@@ -100,8 +103,14 @@ def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock
         if use_mock and mock_file:
             params["file"] = mock_file
         method = "GET" if use_mock else "POST"
-        for kind, value in map_events(
-            iter_sse_lines(url, method=method, json=(None if use_mock else payload), params=(params or None), timeout=timeout)
+        for kind, value in mapper(
+            iter_sse_lines(
+                url,
+                method=method,
+                json=(None if use_mock else payload),
+                params=(params or None),
+                timeout=timeout,
+            )
         ):
             if _ABORT:
                 break
@@ -125,7 +134,18 @@ def stream_and_render(url: str, payload: dict, *, live_window: int = 6, use_mock
 
 # ---------------- CLI / REPL ----------------
 
-def repl(url: str, live_window: int, *, use_mock: bool, timeout: float, mock_file: Optional[str], show_rule: bool) -> int:
+def repl(
+    url: str,
+    live_window: int,
+    *,
+    use_mock: bool,
+    timeout: float,
+    mock_file: Optional[str],
+    show_rule: bool,
+    provider,
+    model: Optional[str],
+    max_tokens: int,
+) -> int:
     console.rule("llm-cli • Streaming Markdown")
     console.print(Text("Type 'exit' or 'quit' to leave.", style="dim"))
 
@@ -146,10 +166,11 @@ def repl(url: str, live_window: int, *, use_mock: bool, timeout: float, mock_fil
 
         # Conversation: append user message and send full history
         history.append({"role": "user", "content": user})
-        payload = build_payload(history)
+        payload = provider.build_payload(history, model=model, max_tokens=max_tokens)
         reply_text = stream_and_render(
             url,
             payload,
+            mapper=provider.map_events,
             live_window=live_window,
             use_mock=use_mock,
             user_text=user,
@@ -164,6 +185,9 @@ def repl(url: str, live_window: int, *, use_mock: bool, timeout: float, mock_fil
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="llm-cli", description="Stream LLM responses as live-rendered Markdown")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default {DEFAULT_URL})")
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use (default: anthropic)")
+    parser.add_argument("--model", help="Model name to send to provider (e.g., gpt-4o, claude-3)")
+    parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens for provider payload (default 4096)")
     parser.add_argument("--mock", action="store_true", help="Use /mock endpoint (GET) instead of POST /invoke")
     parser.add_argument("--mock-file", help="Mock data file to stream (maps to /mock?file=...)")
     parser.add_argument("--live-window", type=int, default=6, help="Lines to repaint live (default 6)")
@@ -188,6 +212,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         pass
 
     endpoint = args.url or os.getenv("LLM_URL", DEFAULT_URL)
+    provider = get_provider(args.provider)
     if args.mock:
         endpoint = to_mock_url(endpoint)
 
@@ -198,6 +223,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         timeout=args.timeout,
         mock_file=args.mock_file,
         show_rule=not args.no_rule,
+        provider=provider,
+        model=args.model,
+        max_tokens=args.max_tokens,
     )
 
 

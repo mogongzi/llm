@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-LLM CLI — streaming with **block-buffered** Markdown
+LLM CLI — streaming with **block-buffered** Markdown (provider-aware)
 - Streams tokens but prints ONLY completed blocks (paragraphs / fenced code)
 - Avoids mid-line ANSI slicing → no missing characters
-- Auto-scrolls naturally; keeps clean scrollback
+- Auto-scrolls naturally; keeps clean scroll back
 - One model-name rule; no extra separators
 - Abort: press 'q' (or Cmd+\\ / Ctrl+\\ for SIGQUIT)
 
@@ -11,7 +11,7 @@ Requirements:
     pip install rich requests
 
 Usage:
-    python llm_cli.py --url http://127.0.0.1:8000/invoke
+    python debug/try.py --url http://127.0.0.1:8000/invoke --provider anthropic
 """
 from __future__ import annotations
 
@@ -19,10 +19,12 @@ import argparse
 import json
 import os
 import select
-import signal
 import sys
 import termios
 import tty
+import threading
+import queue
+from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional
 
@@ -32,6 +34,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.prompt import Prompt
 from rich.text import Text
+from render.block_buffered import BlockBuffer
+from providers import get_provider
 
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_PROMPT = "bold green"
@@ -39,9 +43,6 @@ COLOR_MODEL = "cyan"
 
 console = Console(soft_wrap=True)
 _abort = False
-
-from render.block_buffered import BlockBuffer
-
 
 @contextmanager
 def raw_mode(file):
@@ -67,12 +68,10 @@ def check_for_q(timeout: float = 0.0) -> bool:
     return False
 
 
-def build_payload(user_input: str) -> dict:
-    return {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 2048,
-        "messages": [{"role": "user", "content": user_input}],
-    }
+def build_payload(provider, user_input: str, *, model: Optional[str] = None) -> dict:
+    messages = [{"role": "user", "content": user_input}]
+    # Keep a modest default for responsiveness in this debug CLI
+    return provider.build_payload(messages, model=model, max_tokens=2048)
 
 
 def _pretty_http_error(resp: requests.Response) -> None:
@@ -99,7 +98,32 @@ def _flush(block: str) -> None:
         console.print(Markdown(block))
 
 
-def stream_response(url: str, payload: dict) -> Optional[str]:
+class _SSEReader(threading.Thread):
+    def __init__(self, resp: requests.Response, out: "queue.Queue[str]", stop: threading.Event):
+        super().__init__(daemon=True)
+        self.resp = resp
+        self.out = out
+        self.stop = stop
+
+    def run(self):
+        try:
+            for line in _event_iter_lines(self.resp):
+                if self.stop.is_set():
+                    break
+                try:
+                    self.out.put(line, timeout=0.1)
+                except Exception:
+                    break
+        except Exception:
+            pass
+        finally:
+            try:
+                self.resp.close()
+            except Exception:
+                pass
+
+
+def stream_response(url: str, provider, payload: dict) -> Optional[str]:
     global _abort
     _abort = False
     try:
@@ -111,38 +135,52 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
             model_name: Optional[str] = None
             buf = BlockBuffer()
 
-            with raw_mode(sys.stdin):
-                for data in _event_iter_lines(r):
-                    if _abort or check_for_q(0):
-                        console.print("\n[red]Aborted[/red]")
-                        break
-                    if data == "[DONE]":
-                        break
-                    try:
-                        evt = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
+            stop = threading.Event()
+            q: "queue.Queue[str]" = queue.Queue(maxsize=1000)
+            reader = _SSEReader(r, q, stop)
+            reader.start()
 
-                    etype = evt.get("type")
-                    if etype == "message_start" and isinstance(evt.get("message"), dict):
-                        model_name = evt["message"].get("model") or model_name
+            def _iter_from_queue():
+                global _abort
+                while True:
+                    # non-blocking abort on 'q'
+                    if _abort or check_for_q(0.05):
+                        _abort = True
+                        stop.set()
+                        try:
+                            r.close()
+                        except Exception:
+                            pass
+                        return
+                    try:
+                        item = q.get(timeout=0.05)
+                    except queue.Empty:
+                        if not reader.is_alive():
+                            return
+                        continue
+                    if item:
+                        yield item
+
+            with raw_mode(sys.stdin):
+                for kind, value in provider.map_events(_iter_from_queue()):
+                    if _abort:
+                        break
+                    if kind == "model":
+                        model_name = value or model_name
                         if model_name:
                             console.rule(f"[bold {COLOR_MODEL}]{model_name}")
-
-                    if etype == "content_block_delta":
-                        delta = evt.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            for block in buf.feed(delta.get("text", "")):
-                                _flush(block)
-
-                    # Try to flush completed blocks from 'pending'
-                    if etype == "message_stop":
+                    elif kind == "text":
+                        for block in buf.feed(value or ""):
+                            _flush(block)
+                    elif kind == "done":
                         break
 
             # Flush whatever remains (partial paragraph/last line)
             rest = buf.flush_remaining()
             if rest:
                 _flush(rest)
+            if _abort:
+                console.print("\n[red]Aborted[/red]")
             return None
 
     except RequestException as e:
@@ -150,7 +188,7 @@ def stream_response(url: str, payload: dict) -> Optional[str]:
         return None
 
 
-def interactive_loop(url: str) -> None:
+def interactive_loop(url: str, provider, model: Optional[str]) -> None:
     console.rule("LLM CLI • Live Markdown")
     console.print(Text("Type 'exit' or 'quit' to leave. Press 'q' during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
 
@@ -167,17 +205,20 @@ def interactive_loop(url: str) -> None:
             console.print("[dim]Bye![/dim]")
             return
 
-        payload = build_payload(user_input)
-        stream_response(url, payload)
+        payload = build_payload(provider, user_input, model=model)
+        stream_response(url, provider, payload)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Stream LLM responses and render Markdown by completed blocks.")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Inference endpoint (default: {DEFAULT_URL})")
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use (default: anthropic)")
+    parser.add_argument("--model", help="Optional model name to send to provider")
     args = parser.parse_args(argv)
 
     try:
-        interactive_loop(args.url)
+        provider = get_provider(args.provider)
+        interactive_loop(args.url, provider, args.model)
         return 0
     except KeyboardInterrupt:
         console.print("\n[dim]Bye![/dim]")

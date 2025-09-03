@@ -26,4 +26,3 @@ def iter_sse_lines(
             if not raw:
                 continue
             yield raw[5:].lstrip() if raw.startswith("data:") else raw
-

@@ -1,7 +1,7 @@
 **Overview**
 
 - **Purpose:** Stream LLM responses over SSE and render Markdown cleanly in the terminal.
-- **Clients:** `llm-cli.py` (polished live Markdown), `debug/try.py` (block-buffered), `debug/stream_cli.py` (minimal), `debug/debug_cli.py` (raw/http debug).
+- **Clients:** `llm-cli.py` (polished live Markdown), `debug/try.py` (block-buffered), `debug/debug_cli.py` (raw/http debug).
 - **Proxy:** `ai-server/ai-core-proxy.js` forwards to your provider with OAuth client credentials and exposes `/invoke`, `/mock`, and `/healthz`.
 
 **Quick Start**
@@ -31,10 +31,9 @@
 
 **CLIs**
 
-- `llm-cli.py`: live Markdown with stable scroll back, headings, and code blocks. Respects `LLM_URL` env var.
-- `debug/try.py`: prints only completed blocks (paragraphs/fenced code) for clean output; abort with `q`.
-- `debug/stream_cli.py`: simple token printer.
-- `debug/debug_cli.py`: `--http` prints raw SSE lines; `--raw` prints raw text chunks.
+- `llm-cli.py`: live Markdown with stable scroll back, headings, and code blocks. Supports `--provider` (`anthropic` or `openai`).
+- `debug/try.py`: prints only completed blocks (paragraphs/fenced code); abort with `q`. Supports `--provider`.
+- `debug/debug_cli.py`: `--http` prints raw SSE lines; default prints plain text chunks. Supports `--provider`.
 
 **Troubleshooting**
 

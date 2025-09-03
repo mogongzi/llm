@@ -13,6 +13,8 @@ const {
   PORT = "8000",
 } = process.env;
 
+console.log(LLM_API_ENDPOINT);
+
 const app = express();
 const fs = require("node:fs/promises");
 

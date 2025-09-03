@@ -4,3 +4,5 @@
 node_modules/
 logs/
 .DS_Store
+__pycache__/
+*.py[cod]

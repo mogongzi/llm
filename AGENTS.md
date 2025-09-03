@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - `llm-cli.py`: Main Python CLI that streams SSE and renders live Markdown.
-- `debug/`: Local tools — `try.py` (block-buffered Markdown), `stream_cli.py` (minimal), `debug_cli.py` (raw/HTTP), `richify.py` and `render.py` (Markdown renderers).
+- `debug/`: Local tools — `try.py` (block-buffered Markdown) and `debug_cli.py` (raw/HTTP). Older helpers like `stream_cli.py` and `richify.py` have been removed.
 - `ai-server/`: Node 18+ proxy (`ai-core-proxy.js`) exposing `/invoke`, `/mock`, and `/healthz`; config via `.env`. Includes `mock.dat` for demo streams.
 - `logs/`: Optional local logs/output; not required to run.
 
@@ -14,7 +14,6 @@
 - Flags: `--mock-file path/to/file.dat`, `--timeout 90`, `--live-window 6`, `--no-rule`; default URL can be set via `LLM_URL`.
 - Useful debug:
   - Raw SSE lines: `python3 debug/debug_cli.py --http "your prompt"`
-  - Minimal token stream: `python3 debug/stream_cli.py`
   - Block-buffered renderer: `python3 debug/try.py` (press `q` to abort)
   - Adjust repaint size: `llm-cli.py --live-window 6`
 
