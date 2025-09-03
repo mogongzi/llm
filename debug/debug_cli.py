@@ -1,32 +1,33 @@
-### python3 debug_cli.py --raw "generate hello world in python" | python3 richify.py
-### python3 debug_cli.py --http "generate hello world in python"
-### https://github.com/day50-dev/Streamdown python3 debug_cli.py --raw "how to calculate mse in java" | sd
-### python3 debug_cli.py --raw "generate hello world in python" | bat --paging=never --style=plain --language=markdown
-### python3 debug_cli.py --raw "write a simple nerual network by numpy" | rich - --markdown --force-terminal
+"""
+Minimal SSE debug client
+
+Examples:
+  python3 debug/debug_cli.py --http "hello world"
+  python3 debug/debug_cli.py --provider openai --url http://127.0.0.1:8000/invoke "hi"
+"""
 
 import sys
+import os
 import json
+import argparse
 import requests
 
-URL = "http://127.0.0.1:8000/invoke"
+DEFAULT_URL = "http://127.0.0.1:8000/invoke"
+
+from providers import get_provider
 
 
-def build_payload(user_input: str):
-    return {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 65536,
-        "messages": [
-            {
-                "role": "user",
-                "content": user_input,
-            }
-        ],
-    }
+def build_payload(provider, user_input: str, *, model: str | None = None, max_tokens: int | None = None):
+    messages = [{"role": "user", "content": user_input}]
+    kwargs = {}
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    return provider.build_payload(messages, model=model, **kwargs)
 
 
-def stream_response(payload, raw=False, http=False):
+def stream_response(url: str, provider, payload, raw=False, http=False):
     try:
-        with requests.post(URL, json=payload, stream=True) as r:
+        with requests.post(url, json=payload, stream=True, timeout=60) as r:
             if not r.ok:
                 print(f"HTTP {r.status_code}: {r.text}", file=sys.stderr)
                 return 1
@@ -38,32 +39,21 @@ def stream_response(payload, raw=False, http=False):
                         print(line)
                 return 0
 
-            # Otherwise process as SSE
-            for line in r.iter_lines(decode_unicode=True):
-                if not line or not line.startswith("data:"):
-                    continue
+            # Otherwise process as SSE using the provider adapter
+            def iter_sse(r):
+                for line in r.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        yield line[5:].lstrip()
+                    else:
+                        yield line
 
-                data = line[5:].lstrip()
-                if data == "[DONE]":
-                    break
-
-                try:
-                    evt = json.loads(data)
-                except json.JSONDecodeError:
-                    continue
-
-                if evt.get("type") == "content_block_delta":
-                    delta = evt.get("delta", {})
-                    if delta.get("type") == "text_delta":
-                        text = delta.get("text", "")
-                        if text:
-                            if raw:
-                                sys.stdout.write(text)
-                            else:
-                                sys.stdout.write(text)
-                            sys.stdout.flush()
-
-                if evt.get("type") == "message_stop":
+            for kind, value in provider.map_events(iter_sse(r)):
+                if kind == "text" and value:
+                    sys.stdout.write(value)
+                    sys.stdout.flush()
+                elif kind == "done":
                     break
 
     except requests.exceptions.RequestException as e:
@@ -80,28 +70,25 @@ def stream_response(payload, raw=False, http=False):
     return 0
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python raw-cli.py [--raw|--http] \"your prompt here\"", file=sys.stderr)
-        sys.exit(2)
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Minimal SSE debug client")
+    p.add_argument("prompt", nargs="+", help="Prompt text to send")
+    p.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default: {DEFAULT_URL})")
+    p.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use")
+    p.add_argument("--model", help="Optional model name for the provider")
+    p.add_argument("--http", action="store_true", help="Print raw HTTP lines (SSE)")
+    p.add_argument("--raw", action="store_true", help="Alias for plain text output (default)")
+    p.add_argument("--max-tokens", type=int, help="Optional max_tokens to include in payload")
+    args = p.parse_args(argv)
 
-    raw = False
-    http = False
-    args = []
-
-    for arg in sys.argv[1:]:
-        if arg == "--raw":
-            raw = True
-        elif arg == "--http":
-            http = True
-        else:
-            args.append(arg)
-
-    user_input = " ".join(args).strip()
+    provider = get_provider(args.provider)
+    user_input = " ".join(args.prompt).strip()
     if not user_input:
         print("Error: empty prompt", file=sys.stderr)
-        sys.exit(2)
+        return 2
+    payload = build_payload(provider, user_input, model=args.model, max_tokens=args.max_tokens)
+    return stream_response(args.url, provider, payload, raw=args.raw, http=args.http)
 
-    payload = build_payload(user_input)
-    code = stream_response(payload, raw=raw, http=http)
-    sys.exit(code)
+
+if __name__ == "__main__":
+    raise SystemExit(main())
