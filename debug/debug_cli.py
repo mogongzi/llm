@@ -3,7 +3,7 @@ Minimal SSE debug client
 
 Examples:
   python3 debug/debug_cli.py --http "hello world"
-  python3 debug/debug_cli.py --provider openai --url http://127.0.0.1:8000/invoke "hi"
+  python3 debug/debug_cli.py --provider azure --url http://127.0.0.1:8000/invoke "hi"
 """
 
 import sys
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Minimal SSE debug client")
     p.add_argument("prompt", nargs="+", help="Prompt text to send")
     p.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default: {DEFAULT_URL})")
-    p.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use")
+    p.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "bedrock"), choices=["bedrock", "azure"], help="Provider adapter to use")
     p.add_argument("--model", help="Optional model name for the provider")
     p.add_argument("--http", action="store_true", help="Print raw HTTP lines (SSE)")
     p.add_argument("--raw", action="store_true", help="Alias for plain text output (default)")

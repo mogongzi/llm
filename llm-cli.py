@@ -185,7 +185,7 @@ def repl(
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="llm-cli", description="Stream LLM responses as live-rendered Markdown")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default {DEFAULT_URL})")
-    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "anthropic"), choices=["anthropic", "openai"], help="Provider adapter to use (default: anthropic)")
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "bedrock"), choices=["bedrock", "azure"], help="Provider adapter to use (default: bedrock)")
     parser.add_argument("--model", help="Model name to send to provider (e.g., gpt-4o, claude-3)")
     parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens for provider payload (default 4096)")
     parser.add_argument("--mock", action="store_true", help="Use /mock endpoint (GET) instead of POST /invoke")

@@ -11,7 +11,8 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done", value)
 def get_provider(name: str):
     """Dynamically import a provider module by name.
 
-    Valid names include: "anthropic", "openai" (maps to providers.<name>).
+    Valid names include: "bedrock" (Bedrock Anthropic) and "azure" (Azure OpenAI).
+    These map directly to modules under `providers.<name>`.
     """
     mod_name = name.strip().lower()
     try:
@@ -21,4 +22,3 @@ def get_provider(name: str):
 
 
 __all__ = ["get_provider", "Event"]
-
