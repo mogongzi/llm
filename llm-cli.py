@@ -152,8 +152,14 @@ def stream_and_render(
         params = {}
         if use_mock and mock_file:
             params["file"] = mock_file
+        # Pass through optional mock delay from env var set by argparse
+        mock_delay = os.getenv("LLM_MOCK_DELAY_MS")
+        if use_mock and mock_delay:
+            params["delay_ms"] = mock_delay
         method = "GET" if use_mock else "POST"
         with _raw_mode(sys.stdin):
+            # Show a distinct waiting indicator until first content arrives
+            ms.start_waiting("Waiting for response…")
             for kind, value in mapper(
                 iter_sse_lines(
                     url,
@@ -167,10 +173,14 @@ def stream_and_render(
                     _ABORT = True
                     break
                 if kind == "model":
+                    # First signal received; hide waiting indicator
+                    ms.stop_waiting()
                     model_name = value or model_name
                     if show_rule and model_name:
                         console.rule(f"[bold {COLOR_MODEL}]{model_name}")
                 elif kind == "text":
+                    # First token will also hide the waiting indicator if still visible
+                    ms.stop_waiting()
                     buf.append(value or "")
                     ms.update("".join(buf), final=False)
                 elif kind == "done":
@@ -241,6 +251,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens for provider payload (default 4096)")
     parser.add_argument("--mock", action="store_true", help="Use /mock endpoint (GET) instead of POST /invoke")
     parser.add_argument("--mock-file", help="Mock data file to stream (maps to /mock?file=...)")
+    parser.add_argument("--mock-delay", type=int, default=0, help="Initial delay in ms before first mock chunk (maps to /mock?delay_ms=...)")
     parser.add_argument("--live-window", type=int, default=6, help="Lines to repaint live (default 6)")
     parser.add_argument("--timeout", type=float, default=60.0, help="HTTP timeout in seconds (default 60)")
     parser.add_argument("--no-rule", action="store_true", help="Do not print the model rule header")
@@ -266,6 +277,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     provider = get_provider(args.provider)
     if args.mock:
         endpoint = to_mock_url(endpoint)
+        if args.mock_delay and args.mock_delay > 0:
+            os.environ["LLM_MOCK_DELAY_MS"] = str(args.mock_delay)
 
     return repl(
         endpoint,
