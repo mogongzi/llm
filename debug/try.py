@@ -33,6 +33,16 @@ from requests.exceptions import RequestException
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.prompt import Prompt
+import sys
+sys.path.append('..')
+
+# Try to use prompt-toolkit for better input handling, fallback to basic version
+try:
+    from simple_pt_input import get_simple_pt_input as get_multiline_input
+    USING_PROMPT_TOOLKIT = True
+except ImportError:
+    from multiline_input import get_multiline_input
+    USING_PROMPT_TOOLKIT = False
 from rich.text import Text
 from render.block_buffered import BlockBuffer
 from providers import get_provider
@@ -190,11 +200,18 @@ def stream_response(url: str, provider, payload: dict) -> Optional[str]:
 
 def interactive_loop(url: str, provider, model: Optional[str]) -> None:
     console.rule("LLM CLI • Live Markdown")
-    console.print(Text("Type 'exit' or 'quit' to leave. Press Esc during stream, or Cmd+\\ (Mac)/Ctrl+\\ to abort.", style="dim"))
+    if USING_PROMPT_TOOLKIT:
+        console.print(Text("Type 'exit' or 'quit' to leave. Shift+Enter for new line, Enter to submit. Press Esc during stream, or Cmd+\\\\ (Mac)/Ctrl+\\\\ to abort.", style="dim"))
+    else:
+        console.print(Text("Type 'exit' or 'quit' to leave. Empty line to submit, Enter for new line. Press Esc during stream, or Cmd+\\\\ (Mac)/Ctrl+\\\\ to abort.", style="dim"))
 
     while True:
         try:
-            user_input = Prompt.ask(Text("prompt>", style=COLOR_PROMPT)).strip()
+            user_input = get_multiline_input(console, COLOR_PROMPT)
+            if user_input is None:
+                console.print("[dim]Bye![/dim]")
+                return
+            user_input = user_input.strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Bye![/dim]")
             return

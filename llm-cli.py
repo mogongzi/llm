@@ -32,6 +32,14 @@ from sse_client import iter_sse_lines
 from providers import get_provider
 from render.markdown_live import MarkdownStream
 
+# Try to use prompt-toolkit for better input handling, fallback to basic version
+try:
+    from simple_pt_input import get_simple_pt_input as get_multiline_input
+    USING_PROMPT_TOOLKIT = True
+except ImportError:
+    from multiline_input import get_multiline_input
+    USING_PROMPT_TOOLKIT = False
+
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_MODEL = "cyan"
@@ -209,14 +217,21 @@ def repl(
     max_tokens: int,
 ) -> int:
     console.rule("llm-cli • Streaming Markdown")
-    console.print(Text("Type 'exit' or 'quit' to leave. Press Esc during stream, or Ctrl+C.", style="dim"))
+    if USING_PROMPT_TOOLKIT:
+        console.print(Text("Type 'exit' or 'quit' to leave. Ctrl+J for new line, Enter to submit. Press Esc during stream, or Ctrl+C.", style="dim"))
+    else:
+        console.print(Text("Type 'exit' or 'quit' to leave. Empty line to submit, Enter for new line. Press Esc during stream, or Ctrl+C.", style="dim"))
 
     # Minimal in-memory conversation history
     history: List[dict] = []
 
     while True:
         try:
-            user = console.input(f"[{PROMPT_STYLE}]prompt>[/] ").strip()
+            user = get_multiline_input(console, PROMPT_STYLE)
+            if user is None:
+                console.print("[dim]Bye![/dim]")
+                return 0
+            user = user.strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Bye![/dim]")
             return 0
