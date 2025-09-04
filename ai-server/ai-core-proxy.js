@@ -20,6 +20,10 @@ const fs = require("node:fs/promises");
 
 app.get("/mock", async (req, res) => {
   const filePath = req.query.file || "mock.dat";
+  const delayMs = Math.max(
+    0,
+    Number(req.query.delay_ms ?? req.query.delay ?? 0) || 0
+  );
 
   // Random jitter between 20 and 100 ms
   const jitter = () => 20 + Math.floor(Math.random() * (100 - 50 + 1));
@@ -62,7 +66,10 @@ app.get("/mock", async (req, res) => {
     setTimeout(writeNext, jitter());
   };
 
-  writeNext();
+  // Optional startup delay before first chunk to let clients show spinners
+  console.log(`Debugging... ${delayMs} ms initial delay`);
+  if (delayMs > 0) setTimeout(writeNext, delayMs);
+  else writeNext();
 });
 
 // ---- tiny raw-body helper (no body-parser needed)

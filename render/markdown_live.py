@@ -12,6 +12,7 @@ from rich.markdown import CodeBlock, Heading, Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.spinner import Spinner
 
 
 class _CodeBlockTight(CodeBlock):
@@ -49,6 +50,8 @@ class MarkdownStream:
     min_delay: float = 1.0 / 20
     live_window: int = 6
     printed: List[str] = None
+    waiting_active: bool = False
+    waiting_message: str = ""
 
     def __post_init__(self):
         self.printed = []
@@ -73,6 +76,38 @@ class MarkdownStream:
                 pass
             self.live = None
 
+    def start_waiting(self, message: str = "Waiting for response…") -> None:
+        """Show a distinct animated waiting indicator inside the live area.
+
+        Uses a spinner + dim italic message, clearly different from model output.
+        """
+        if self.waiting_active:
+            return
+        self._ensure_live()
+        self.waiting_active = True
+        self.waiting_message = message
+        spinner = Spinner("dots", text=Text(message, style="dim italic"), style="yellow")
+        try:
+            self.live.update(spinner)
+            self.live.refresh()
+        except Exception:
+            pass
+
+    def stop_waiting(self) -> None:
+        if not self.waiting_active:
+            return
+        self.waiting_active = False
+        self.waiting_message = ""
+        if self.live:
+            try:
+                # Clear Live region fully and refresh so previous spinner text is removed
+                self.live.update(Text(""))
+                self.live.refresh()
+            except Exception:
+                pass
+        # Reset pacing so the next content update isn't throttled
+        self.when = 0.0
+
     def update(self, cumulative_text: str, final: bool = False) -> None:
         self._ensure_live()
 
@@ -89,6 +124,14 @@ class MarkdownStream:
         total = len(lines)
         stable = total if final else max(0, total - self.live_window)
 
+        # If waiting indicator is active and we now have any content, stop it
+        if self.waiting_active and total > 0:
+            self.stop_waiting()
+
+        # While waiting and no content yet, keep the spinner visible
+        if self.waiting_active and total == 0 and not final:
+            return
+
         if final or stable > 0:
             already = len(self.printed)
             need = stable - already
@@ -103,4 +146,3 @@ class MarkdownStream:
 
         tail = "".join(lines[stable:])
         self.live.update(Text.from_ansi(tail))
-
