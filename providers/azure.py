@@ -4,7 +4,7 @@ import json
 from typing import Dict, Iterator, List, Optional, Tuple
 
 
-Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done", value)
+Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done"|"tokens", value)
 
 
 def build_payload(
@@ -33,6 +33,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
     Emits:
     - ("model", name) on first chunk carrying `model`
     - ("text", delta) for each `choices[0].delta.content` string
+    - ("tokens", token_count_str) on completion with usage info
     - ("done", None) on `[DONE]` or when a `finish_reason` is observed
     """
     sent_model = False
@@ -56,6 +57,13 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             content = delta.get("content")
             if isinstance(content, str) and content:
                 yield ("text", content)
+
+        # Extract token usage if available
+        usage = evt.get("usage")
+        if usage:
+            total_tokens = usage.get("total_tokens", 0)
+            if total_tokens > 0:
+                yield ("tokens", str(total_tokens))
 
         # Signal completion if provider indicates finish
         for ch in choices:

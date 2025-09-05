@@ -23,7 +23,7 @@ import os
 import signal
 import sys
 from contextlib import contextmanager
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 from requests.exceptions import RequestException
 from rich.console import Console
@@ -31,14 +31,7 @@ from rich.text import Text
 from sse_client import iter_sse_lines
 from providers import get_provider
 from render.markdown_live import MarkdownStream
-
-# Try to use prompt-toolkit for better input handling, fallback to basic version
-try:
-    from simple_pt_input import get_simple_pt_input as get_multiline_input
-    USING_PROMPT_TOOLKIT = True
-except ImportError:
-    from multiline_input import get_multiline_input
-    USING_PROMPT_TOOLKIT = False
+from simple_pt_input import get_multiline_input
 
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
@@ -144,7 +137,7 @@ def stream_and_render(
     timeout: float = 30.0,
     mock_file: Optional[str] = None,
     show_rule: bool = True,
-) -> str:
+) -> Tuple[str, int]:
     """Stream SSE and render incrementally.
 
     When use_mock=True, perform a GET to an SSE /mock endpoint and pass the prompt via ?text=...
@@ -191,6 +184,9 @@ def stream_and_render(
                     ms.stop_waiting()
                     buf.append(value or "")
                     ms.update("".join(buf), final=False)
+                elif kind == "tokens":
+                    # Return token count for tracking
+                    return "".join(buf), int(value) if value and value.isdigit() else 0
                 elif kind == "done":
                     break
     except RequestException as e:
@@ -199,7 +195,7 @@ def stream_and_render(
         ms.update("".join(buf), final=True)
         if _ABORT:
             console.print("[dim]Aborted[/dim]")
-    return "".join(buf)
+    return "".join(buf), 0
 
 
 # ---------------- CLI / REPL ----------------
@@ -216,18 +212,27 @@ def repl(
     model: Optional[str],
     max_tokens: int,
 ) -> int:
-    console.rule("llm-cli • Streaming Markdown")
-    if USING_PROMPT_TOOLKIT:
-        console.print(Text("Type 'exit' or 'quit' to leave. Ctrl+J for new line, Enter to submit. Press Esc during stream, or Ctrl+C.", style="dim"))
-    else:
-        console.print(Text("Type 'exit' or 'quit' to leave. Empty line to submit, Enter for new line. Press Esc during stream, or Ctrl+C.", style="dim"))
+    console.rule("Talk 2 LLM • AI Core")
+    console.print(Text("Type 'exit' or 'quit' to leave. Press Esc during stream, or Ctrl+C.", style="dim"))
 
     # Minimal in-memory conversation history
     history: List[dict] = []
+    total_tokens_used = 0
+    max_tokens_limit = 200000  # Default limit, can be made configurable
 
     while True:
         try:
-            user = get_multiline_input(console, PROMPT_STYLE)
+            # Format token info for display
+            if total_tokens_used > 0:
+                percentage = (total_tokens_used / max_tokens_limit) * 100
+                if total_tokens_used >= 1000:
+                    token_display = f"{total_tokens_used/1000:.1f}k/{max_tokens_limit/1000:.0f}k ({percentage:.1f}%)"
+                else:
+                    token_display = f"{total_tokens_used}/{max_tokens_limit} ({percentage:.1f}%)"
+            else:
+                token_display = None
+
+            user = get_multiline_input(console, PROMPT_STYLE, token_display)
             if user is None:
                 console.print("[dim]Bye![/dim]")
                 return 0
@@ -244,7 +249,7 @@ def repl(
         # Conversation: append user message and send full history
         history.append({"role": "user", "content": user})
         payload = provider.build_payload(history, model=model, max_tokens=max_tokens)
-        reply_text = stream_and_render(
+        reply_text, tokens_used = stream_and_render(
             url,
             payload,
             mapper=provider.map_events,
@@ -254,6 +259,10 @@ def repl(
             mock_file=mock_file,
             show_rule=show_rule,
         )
+        # Update token tracking
+        if tokens_used > 0:
+            total_tokens_used += tokens_used
+
         # Append assistant reply to history
         history.append({"role": "assistant", "content": reply_text})
 

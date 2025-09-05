@@ -8,8 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Node 18+
 - Python 3.9+
-- `pip install rich requests`
-- **Optional for enhanced input**: `pip install prompt-toolkit` (enables Shift+Enter for new lines)
+- `pip install rich requests prompt-toolkit`
 
 **Setup and Start:**
 
@@ -34,9 +33,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `--provider bedrock|azure` - Select provider type
 
 **Multi-line Input:**
-- **With prompt-toolkit installed**: Shift+Enter for new lines, Enter to submit
-- **Without prompt-toolkit**: Empty line to submit when you have content
-- **All versions**: `/paste` mode for large content blocks
+- **Enter** = Submit message
+- **Ctrl+J** = New line
+- **`/paste`** = Special mode for large content (type `/end` to finish)
+- **`▌` cursor** appears on every line for visual consistency
 
 ## Architecture Overview
 
@@ -65,7 +65,8 @@ This is a streaming LLM client system with live Markdown rendering:
 
 ## Key Files
 
-- `llm-cli.py` - Main polished CLI with live Markdown rendering
+- `llm-cli.py` - Main CLI with live Markdown rendering and prompt-toolkit input
+- `simple_pt_input.py` - Multi-line input handler with `▌` cursor support
 - `ai-server/ai-core-proxy.js` - Express server handling `/invoke`, `/mock`, `/healthz` endpoints
 - `render/markdown_live.py` - Custom Rich-based Markdown renderer with code block handling
 - `debug/try.py` - Block-buffered Markdown renderer for testing
