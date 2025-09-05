@@ -52,13 +52,20 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                 if text:
                     yield ("text", text)
         elif e_type == "message_stop":
-            # Extract token usage if available
+            # Extract token usage and cost if available
             usage = evt.get("amazon-bedrock-invocationMetrics") or evt.get("usage")
             if usage:
                 input_tokens = usage.get("inputTokenCount", 0) or usage.get("input_tokens", 0)
                 output_tokens = usage.get("outputTokenCount", 0) or usage.get("output_tokens", 0)
                 total_tokens = input_tokens + output_tokens
                 if total_tokens > 0:
-                    yield ("tokens", str(total_tokens))
+                    # Calculate cost (Claude 3.5 Sonnet pricing: $3/1M input, $15/1M output)
+                    input_cost = (input_tokens / 1000000) * 3.0
+                    output_cost = (output_tokens / 1000000) * 15.0
+                    total_cost = input_cost + output_cost
+                    
+                    # Format: "tokens|input_tokens|output_tokens|cost"
+                    token_info = f"{total_tokens}|{input_tokens}|{output_tokens}|{total_cost:.6f}"
+                    yield ("tokens", token_info)
             yield ("done", None)
             break
