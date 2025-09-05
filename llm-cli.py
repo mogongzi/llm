@@ -137,7 +137,7 @@ def stream_and_render(
     timeout: float = 30.0,
     mock_file: Optional[str] = None,
     show_rule: bool = True,
-) -> Tuple[str, int]:
+) -> Tuple[str, int, float]:
     """Stream SSE and render incrementally.
 
     When use_mock=True, perform a GET to an SSE /mock endpoint and pass the prompt via ?text=...
@@ -185,8 +185,16 @@ def stream_and_render(
                     buf.append(value or "")
                     ms.update("".join(buf), final=False)
                 elif kind == "tokens":
-                    # Return token count for tracking
-                    return "".join(buf), int(value) if value and value.isdigit() else 0
+                    # Parse token info: "tokens|input_tokens|output_tokens|cost"
+                    if value and "|" in value:
+                        parts = value.split("|")
+                        if len(parts) >= 4:
+                            total_tokens = int(parts[0]) if parts[0].isdigit() else 0
+                            cost = float(parts[3]) if parts[3] else 0.0
+                            return "".join(buf), total_tokens, cost
+                    # Fallback for old format
+                    tokens = int(value) if value and value.isdigit() else 0
+                    return "".join(buf), tokens, 0.0
                 elif kind == "done":
                     break
     except RequestException as e:
@@ -195,7 +203,7 @@ def stream_and_render(
         ms.update("".join(buf), final=True)
         if _ABORT:
             console.print("[dim]Aborted[/dim]")
-    return "".join(buf), 0
+    return "".join(buf), 0, 0.0
 
 
 # ---------------- CLI / REPL ----------------
@@ -218,6 +226,7 @@ def repl(
     # Minimal in-memory conversation history
     history: List[dict] = []
     total_tokens_used = 0
+    total_cost = 0.0
     max_tokens_limit = 200000  # Default limit, can be made configurable
 
     while True:
@@ -226,9 +235,19 @@ def repl(
             if total_tokens_used > 0:
                 percentage = (total_tokens_used / max_tokens_limit) * 100
                 if total_tokens_used >= 1000:
-                    token_display = f"{total_tokens_used/1000:.1f}k/{max_tokens_limit/1000:.0f}k ({percentage:.1f}%)"
+                    token_part = f"{total_tokens_used/1000:.1f}k/{max_tokens_limit/1000:.0f}k ({percentage:.1f}%)"
                 else:
-                    token_display = f"{total_tokens_used}/{max_tokens_limit} ({percentage:.1f}%)"
+                    token_part = f"{total_tokens_used}/{max_tokens_limit} ({percentage:.1f}%)"
+                
+                # Format cost display
+                if total_cost >= 0.01:
+                    cost_part = f"${total_cost:.3f}"
+                elif total_cost >= 0.001:
+                    cost_part = f"${total_cost:.4f}"
+                else:
+                    cost_part = f"${total_cost:.6f}"
+                
+                token_display = f"{token_part} {cost_part}"
             else:
                 token_display = None
 
@@ -249,7 +268,7 @@ def repl(
         # Conversation: append user message and send full history
         history.append({"role": "user", "content": user})
         payload = provider.build_payload(history, model=model, max_tokens=max_tokens)
-        reply_text, tokens_used = stream_and_render(
+        reply_text, tokens_used, cost_used = stream_and_render(
             url,
             payload,
             mapper=provider.map_events,
@@ -259,9 +278,11 @@ def repl(
             mock_file=mock_file,
             show_rule=show_rule,
         )
-        # Update token tracking
+        # Update token and cost tracking
         if tokens_used > 0:
             total_tokens_used += tokens_used
+        if cost_used > 0:
+            total_cost += cost_used
 
         # Append assistant reply to history
         history.append({"role": "assistant", "content": reply_text})

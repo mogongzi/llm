@@ -21,6 +21,7 @@ from typing import Optional
 
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 
 # Constants for visual consistency
@@ -148,7 +149,7 @@ def _create_prompt_functions():
     """
     def get_main_prompt():
         """Return the main prompt string with cursor character."""
-        return f'{CURSOR_CHARACTER} '
+        return HTML(f'<lemonchiffon>{CURSOR_CHARACTER}</lemonchiffon> ')
 
     def get_continuation_prompt(width, line_number, is_soft_wrap):
         """
@@ -162,7 +163,7 @@ def _create_prompt_functions():
         Returns:
             str: Same cursor character for visual consistency
         """
-        return f'{CURSOR_CHARACTER} '
+        return HTML(f'<lemonchiffon>{CURSOR_CHARACTER}</lemonchiffon> ')
 
     return get_main_prompt, get_continuation_prompt
 

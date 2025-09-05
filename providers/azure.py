@@ -58,12 +58,21 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             if isinstance(content, str) and content:
                 yield ("text", content)
 
-        # Extract token usage if available
+        # Extract token usage and cost if available
         usage = evt.get("usage")
         if usage:
             total_tokens = usage.get("total_tokens", 0)
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
             if total_tokens > 0:
-                yield ("tokens", str(total_tokens))
+                # Calculate cost (GPT-4o pricing: $2.50/1M input, $10/1M output)
+                input_cost = (input_tokens / 1000000) * 2.50
+                output_cost = (output_tokens / 1000000) * 10.0
+                total_cost = input_cost + output_cost
+                
+                # Format: "tokens|input_tokens|output_tokens|cost"
+                token_info = f"{total_tokens}|{input_tokens}|{output_tokens}|{total_cost:.6f}"
+                yield ("tokens", token_info)
 
         # Signal completion if provider indicates finish
         for ch in choices:
