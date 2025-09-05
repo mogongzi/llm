@@ -4,11 +4,11 @@ import json
 from typing import Dict, Iterator, Optional, Tuple, List
 
 
-Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done"|"tokens", value)
+Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"done"|"tokens", value)
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, **_: dict
 ) -> dict:
     """Construct Bedrock/Anthropic-style chat payload.
 
@@ -16,11 +16,19 @@ def build_payload(
     - Do not include a 'model' key by default; many Bedrock endpoints select model via path/config.
     - Keep structure aligned with existing behavior for backward compatibility.
     """
-    return {
+    payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
         "messages": messages,
     }
+
+    if thinking:
+        payload["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": thinking_tokens
+        }
+
+    return payload
 
 
 def map_events(lines: Iterator[str]) -> Iterator[Event]:
@@ -28,6 +36,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
 
     Emits:
     - ("model", model_name) on message_start
+    - ("thinking", text_chunk) on content_block_delta.thinking_delta
     - ("text", text_chunk) on content_block_delta.text_delta
     - ("tokens", token_count_str) on message_stop with usage info
     - ("done", None) on message_stop or [DONE]
@@ -47,7 +56,11 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                 yield ("model", model)
         elif e_type == "content_block_delta":
             delta = evt.get("delta", {})
-            if delta.get("type") == "text_delta":
+            if delta.get("type") == "thinking_delta":
+                thinking = delta.get("thinking", "")
+                if thinking:
+                    yield ("thinking", thinking)
+            elif delta.get("type") == "text_delta":
                 text = delta.get("text", "")
                 if text:
                     yield ("text", text)
@@ -63,7 +76,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                     input_cost = (input_tokens / 1000000) * 3.0
                     output_cost = (output_tokens / 1000000) * 15.0
                     total_cost = input_cost + output_cost
-                    
+
                     # Format: "tokens|input_tokens|output_tokens|cost"
                     token_info = f"{total_tokens}|{input_tokens}|{output_tokens}|{total_cost:.6f}"
                     yield ("tokens", token_info)

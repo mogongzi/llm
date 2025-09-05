@@ -179,11 +179,15 @@ def stream_and_render(
                     model_name = value or model_name
                     if show_rule and model_name:
                         console.rule(f"[bold {COLOR_MODEL}]{model_name}")
+                elif kind == "thinking":
+                    # First thinking token hides waiting indicator
+                    ms.stop_waiting()
+                    ms.add_thinking(value or "")
                 elif kind == "text":
                     # First token will also hide the waiting indicator if still visible
                     ms.stop_waiting()
                     buf.append(value or "")
-                    ms.update("".join(buf), final=False)
+                    ms.add_response(value or "")
                 elif kind == "tokens":
                     # Parse token info: "tokens|input_tokens|output_tokens|cost"
                     if value and "|" in value:
@@ -228,6 +232,7 @@ def repl(
     total_tokens_used = 0
     total_cost = 0.0
     max_tokens_limit = 200000  # Default limit, can be made configurable
+    thinking_mode = False  # Track thinking mode state
 
     while True:
         try:
@@ -251,10 +256,12 @@ def repl(
             else:
                 token_display = None
 
-            user = get_multiline_input(console, PROMPT_STYLE, token_display)
-            if user is None:
+            user, use_thinking, thinking_mode = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode)
+            if user == "__EXIT__":
                 console.print("[dim]Bye![/dim]")
                 return 0
+            if user is None:
+                continue  # Command executed or empty input
             user = user.strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Bye![/dim]")
@@ -267,7 +274,7 @@ def repl(
 
         # Conversation: append user message and send full history
         history.append({"role": "user", "content": user})
-        payload = provider.build_payload(history, model=model, max_tokens=max_tokens)
+        payload = provider.build_payload(history, model=model, max_tokens=max_tokens, thinking=use_thinking)
         reply_text, tokens_used, cost_used = stream_and_render(
             url,
             payload,
