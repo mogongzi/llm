@@ -19,9 +19,9 @@ def main():
     while True:
         console.print("[yellow]Enter some text:[/yellow]")
         
-        result = get_multiline_input(console, "bold green")
+        result, _, _ = get_multiline_input(console, "bold green")
         
-        if result is None:
+        if result == "__EXIT__" or result is None:
             console.print("[dim]Goodbye![/dim]")
             break
         

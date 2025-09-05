@@ -33,8 +33,9 @@ PASTE_END_COMMAND = "/end"
 def get_multiline_input(
     console: Console,
     prompt_style: str = "bold green",
-    token_info: Optional[str] = None
-) -> Optional[str]:
+    token_info: Optional[str] = None,
+    thinking_mode: bool = False
+) -> tuple[Optional[str], bool, bool]:
     """
     Get multi-line input from user with enhanced prompt-toolkit interface.
 
@@ -50,9 +51,10 @@ def get_multiline_input(
         prompt_style: Style string for prompt formatting (currently unused
                      but kept for API compatibility)
         token_info: Optional token usage string to display (e.g., "1.2k/200k (0.6%)")
+        thinking_mode: Current thinking mode state (ON/OFF)
 
     Returns:
-        Optional[str]: The user's input as a string, or None if cancelled
+        tuple[Optional[str], bool, bool]: (user_input, use_thinking, new_thinking_mode)
 
     Raises:
         No exceptions are raised - all errors are caught and handled gracefully
@@ -64,15 +66,15 @@ def get_multiline_input(
         ...     print(f"User entered: {user_input}")
     """
     key_bindings = _create_key_bindings()
-    _display_usage_instructions(console, token_info)
+    _display_usage_instructions(console, token_info, thinking_mode)
 
     try:
         user_input = _prompt_for_input(key_bindings)
-        return _process_user_input(user_input, console)
+        return _process_user_input(user_input, console, thinking_mode)
 
     except (KeyboardInterrupt, EOFError):
         _display_cancellation_message(console)
-        return None
+        return "__EXIT__", False, thinking_mode  # Special exit signal
 
 
 def _create_key_bindings() -> KeyBindings:
@@ -111,15 +113,19 @@ def _create_key_bindings() -> KeyBindings:
     return bindings
 
 
-def _display_usage_instructions(console: Console, token_info: Optional[str] = None) -> None:
+def _display_usage_instructions(console: Console, token_info: Optional[str] = None, thinking_mode: bool = False) -> None:
     """
     Display usage instructions to help user understand key bindings.
 
     Args:
         console: Rich console instance for styled output
         token_info: Optional token usage string to display on the right side
+        thinking_mode: Whether thinking mode is currently enabled
     """
-    instructions = "↵ send    Ctrl+J newline    Esc/Ctrl+C=cancel"
+    if thinking_mode:
+        instructions = "↵ send    Ctrl+J newline    /think reasoning [ON]    /think-off    Esc/Ctrl+C=cancel"
+    else:
+        instructions = "↵ send    Ctrl+J newline    /think reasoning    Esc/Ctrl+C=cancel"
 
     if token_info:
         # Calculate padding to right-align token info
@@ -189,27 +195,58 @@ def _prompt_for_input(key_bindings: KeyBindings) -> str:
     )
 
 
-def _process_user_input(user_input: str, console: Console) -> Optional[str]:
+def _process_user_input(user_input: str, console: Console, thinking_mode: bool) -> tuple[Optional[str], bool, bool]:
     """
     Process the raw user input and handle special commands.
 
     Args:
         user_input: Raw input string from prompt-toolkit
         console: Rich console instance for any needed output
+        thinking_mode: Current thinking mode state
 
     Returns:
-        Optional[str]: Processed input or result from special command handling
+        tuple[Optional[str], bool, bool]: (processed_input, use_thinking, new_thinking_mode)
     """
     if not user_input:
-        return None
+        return None, False, thinking_mode
 
     cleaned_input = user_input.strip()
 
+    # Handle thinking mode toggle commands
+    if cleaned_input == '/think':
+        if thinking_mode:
+            console.print("[yellow]Thinking mode is already ON. Use /think-off to disable.[/yellow]")
+        else:
+            console.print("[green]Thinking mode enabled. All messages will now show reasoning.[/green]")
+        return None, False, not thinking_mode  # Toggle thinking mode
+
+    elif cleaned_input == '/think-off':
+        if not thinking_mode:
+            console.print("[yellow]Thinking mode is already OFF. Use /think to enable.[/yellow]")
+        else:
+            console.print("[dim]Thinking mode disabled.[/dim]")
+        return None, False, False  # Turn off thinking mode
+
+    # Handle legacy /think <message> format for backward compatibility
+    elif cleaned_input.startswith('/think '):
+        actual_message = cleaned_input[7:].strip()  # Remove "/think " prefix
+        if actual_message:
+            console.print("[dim]Tip: Use /think to toggle thinking mode, then just type your message.[/dim]")
+            return actual_message, True, thinking_mode
+        else:
+            console.print("[yellow]Use /think to toggle thinking mode, or /think <message> for one-time thinking.[/yellow]")
+            return None, False, thinking_mode
+
     # Handle special paste command
     if cleaned_input == PASTE_COMMAND:
-        return _handle_paste_mode(console)
+        paste_result = _handle_paste_mode(console)
+        return paste_result, thinking_mode, thinking_mode  # Use current thinking mode for pasted content
 
-    return cleaned_input if cleaned_input else None
+    # Regular message - use current thinking mode
+    if cleaned_input:
+        return cleaned_input, thinking_mode, thinking_mode
+    else:
+        return None, False, thinking_mode
 
 
 def _display_cancellation_message(console: Console) -> None:
