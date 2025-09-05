@@ -5,7 +5,7 @@ from typing import Iterator, List, Optional, Tuple
 
 
 # Unified event type used by provider adapters
-Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done", value)
+Event = Tuple[str, Optional[str]]  # ("model"|"text"|"done"|"tokens", value)
 
 
 def get_provider(name: str):
