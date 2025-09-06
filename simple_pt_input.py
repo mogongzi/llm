@@ -6,13 +6,13 @@ This module provides a sophisticated multi-line input interface with:
 - Visual ▌ cursor indicator on every line
 - Enter key for submission
 - Ctrl+J for adding new lines
-- Special /paste mode for large content blocks
+- Ctrl+J for adding new lines
 - Consistent cross-platform behavior
 
 Key Features:
     - Enter = Submit message
     - Ctrl+J = Add new line
-    - /paste = Enter special paste mode
+    - Ctrl+J = Add new line for multi-line input
     - ▌ cursor appears on every line for visual consistency
 """
 from __future__ import annotations
@@ -26,8 +26,6 @@ from rich.console import Console
 
 # Constants for visual consistency
 CURSOR_CHARACTER = "▌"
-PASTE_COMMAND = "/paste"
-PASTE_END_COMMAND = "/end"
 
 
 def get_multiline_input(
@@ -44,7 +42,7 @@ def get_multiline_input(
     - Visual cursor indicator (▌) on every line
     - Enter key submits the complete input
     - Ctrl+J adds new lines for multi-line messages
-    - Special /paste command for handling large content blocks
+    - Ctrl+J for multi-line input support
     - Consistent escape/cancellation behavior
 
     Args:
@@ -174,14 +172,14 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
         thinking_mode: Whether thinking mode is currently enabled
     """
     if thinking_mode:
-        instructions = "↵ send    Ctrl+J newline    /think reasoning [ON]    /think-off    Esc/Ctrl+C=cancel"
+        instructions = "↵ send    Ctrl+J newline    /think reasoning [ON]    Esc/Ctrl+C=cancel"
     else:
         instructions = "↵ send    Ctrl+J newline    /think reasoning    Esc/Ctrl+C=cancel"
 
     if token_info:
         # Calculate padding to right-align token info
         terminal_width = console.size.width
-        base_length = len("↵ send    Ctrl+J newline    Esc/Ctrl+C=cancel")
+        base_length = len(instructions)  # Use actual instruction text length
         token_length = len(f"Tokens: {token_info}")
         padding_needed = terminal_width - base_length - token_length - 4  # 4 for spacing buffer
 
@@ -264,35 +262,23 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool) 
 
     cleaned_input = user_input.strip()
 
-    # Handle thinking mode toggle commands
+    # Handle thinking mode toggle command
     if cleaned_input == '/think':
         if thinking_mode:
-            console.print("[yellow]Thinking mode is already ON. Use /think-off to disable.[/yellow]")
+            console.print("[dim]Thinking mode disabled.[/dim]")
         else:
             console.print("[green]Thinking mode enabled. All messages will now show reasoning.[/green]")
         return None, False, not thinking_mode  # Toggle thinking mode
-
-    elif cleaned_input == '/think-off':
-        if not thinking_mode:
-            console.print("[yellow]Thinking mode is already OFF. Use /think to enable.[/yellow]")
-        else:
-            console.print("[dim]Thinking mode disabled.[/dim]")
-        return None, False, False  # Turn off thinking mode
 
     # Handle legacy /think <message> format for backward compatibility
     elif cleaned_input.startswith('/think '):
         actual_message = cleaned_input[7:].strip()  # Remove "/think " prefix
         if actual_message:
-            console.print("[dim]Tip: Use /think to toggle thinking mode, then just type your message.[/dim]")
+            console.print("[dim]Tip: Use /think to toggle thinking mode on/off, then just type your message.[/dim]")
             return actual_message, True, thinking_mode
         else:
-            console.print("[yellow]Use /think to toggle thinking mode, or /think <message> for one-time thinking.[/yellow]")
+            console.print("[yellow]Use /think to toggle thinking mode on/off, or /think <message> for one-time thinking.[/yellow]")
             return None, False, thinking_mode
-
-    # Handle special paste command
-    if cleaned_input == PASTE_COMMAND:
-        paste_result = _handle_paste_mode(console)
-        return paste_result, thinking_mode, thinking_mode  # Use current thinking mode for pasted content
 
     # Regular message - use current thinking mode
     if cleaned_input:
@@ -311,69 +297,6 @@ def _display_cancellation_message(console: Console) -> None:
     console.print("\n[dim]Cancelled[/dim]")
 
 
-def _handle_paste_mode(console: Console) -> Optional[str]:
-    """
-    Handle special paste mode for large content blocks.
-
-    In paste mode, users can input large blocks of text (like JSON, code, etc.)
-    line by line until they type the end command. This is useful for content
-    that would be difficult to format using the normal multi-line input.
-
-    Args:
-        console: Rich console instance for displaying instructions and messages
-
-    Returns:
-        Optional[str]: Combined content from all input lines, or None if cancelled
-
-    Usage:
-        User types "/paste" in normal input, then:
-        1. Enters content line by line
-        2. Types "/end" on a new line to finish
-        3. All content between /paste and /end is returned as single string
-    """
-    _display_paste_mode_instructions(console)
-
-    content_lines = []
-
-    while True:
-        try:
-            line = input()
-
-            if line == PASTE_END_COMMAND:
-                break
-
-            content_lines.append(line)
-
-        except EOFError:
-            # Ctrl+D pressed - treat as end of paste
-            break
-        except KeyboardInterrupt:
-            # Ctrl+C pressed - cancel paste mode
-            console.print("[dim]Paste cancelled[/dim]")
-            return None
-
-    # Join all lines and clean up whitespace
-    combined_content = '\n'.join(content_lines).strip()
-    return combined_content if combined_content else None
-
-
-def _display_paste_mode_instructions(console: Console) -> None:
-    """
-    Display instructions for paste mode usage.
-
-    Args:
-        console: Rich console instance for styled output
-    """
-    instruction_text = (
-        f"Paste mode: Enter your content, then type "
-        f"'{PASTE_END_COMMAND}' on a new line to finish:"
-    )
-    console.print(f"[yellow]{instruction_text}[/yellow]")
-
-
-# Legacy function name for backward compatibility
-# This ensures existing code continues to work after refactoring
-handle_paste_mode = _handle_paste_mode
 
 
 def _run_interactive_test() -> None:
@@ -381,8 +304,7 @@ def _run_interactive_test() -> None:
     Run an interactive test of the multi-line input system.
 
     This function demonstrates the input system's capabilities and allows
-    manual testing of all features including normal input, multi-line input,
-    and paste mode functionality.
+    manual testing of all features including normal input and multi-line input.
     """
     console = Console()
 
@@ -415,7 +337,6 @@ def _display_test_instructions(console: Console) -> None:
     console.print("[dim]Available features:[/dim]")
     console.print("• Enter = Submit message")
     console.print("• Ctrl+J = Add new line")
-    console.print("• /paste = Enter paste mode for large content")
     console.print("• Esc or Ctrl+C = Cancel current input")
     console.print("• Type 'exit' or 'quit' to end test")
     console.print()
