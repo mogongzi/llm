@@ -256,7 +256,9 @@ def repl(
             else:
                 token_display = None
 
-            user, use_thinking, thinking_mode = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode)
+            # Extract user messages from conversation history for navigation
+            user_history = [msg["content"] for msg in history if msg["role"] == "user"]
+            user, use_thinking, thinking_mode = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode, user_history)
             if user == "__EXIT__":
                 console.print("[dim]Bye![/dim]")
                 return 0
