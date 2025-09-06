@@ -34,7 +34,8 @@ def get_multiline_input(
     console: Console,
     prompt_style: str = "bold green",
     token_info: Optional[str] = None,
-    thinking_mode: bool = False
+    thinking_mode: bool = False,
+    history: Optional[list[str]] = None
 ) -> tuple[Optional[str], bool, bool]:
     """
     Get multi-line input from user with enhanced prompt-toolkit interface.
@@ -52,6 +53,7 @@ def get_multiline_input(
                      but kept for API compatibility)
         token_info: Optional token usage string to display (e.g., "1.2k/200k (0.6%)")
         thinking_mode: Current thinking mode state (ON/OFF)
+        history: Optional list of previous user inputs for up/down navigation
 
     Returns:
         tuple[Optional[str], bool, bool]: (user_input, use_thinking, new_thinking_mode)
@@ -65,11 +67,11 @@ def get_multiline_input(
         >>> if user_input:
         ...     print(f"User entered: {user_input}")
     """
-    key_bindings = _create_key_bindings()
+    key_bindings = _create_key_bindings(history or [])
     _display_usage_instructions(console, token_info, thinking_mode)
 
     try:
-        user_input = _prompt_for_input(key_bindings)
+        user_input = _prompt_for_input(key_bindings, history)
         return _process_user_input(user_input, console, thinking_mode)
 
     except (KeyboardInterrupt, EOFError):
@@ -77,18 +79,28 @@ def get_multiline_input(
         return "__EXIT__", False, thinking_mode  # Special exit signal
 
 
-def _create_key_bindings() -> KeyBindings:
+def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     """
     Create and configure key bindings for the input interface.
 
     Sets up custom key combinations to override prompt-toolkit's default
     multiline behavior, allowing us to control when input is submitted
-    versus when new lines are added.
+    versus when new lines are added. Also includes history navigation.
+
+    Args:
+        history: List of previous user inputs for up/down arrow navigation
 
     Returns:
         KeyBindings: Configured key bindings object for prompt-toolkit
     """
     bindings = KeyBindings()
+    
+    # History navigation state
+    if history is None:
+        history = []
+    
+    history_position = len(history)  # Start at end (no selection)
+    original_text = ""  # Store original text when navigating
 
     @bindings.add('enter', eager=True)
     def handle_enter_key_submission(event):
@@ -109,6 +121,45 @@ def _create_key_bindings() -> KeyBindings:
     def handle_escape_cancellation(event):
         """Handle Escape key press - cancel input and return None."""
         event.app.exit(result=None)
+
+    @bindings.add('up', eager=True)
+    def handle_up_arrow_history(event):
+        """Handle Up arrow key press - navigate to previous history item."""
+        nonlocal history_position, original_text
+        
+        if not history:
+            return  # No history to navigate
+            
+        # Save original text when first navigating
+        if history_position == len(history):
+            original_text = event.current_buffer.text
+            
+        # Move up in history (towards older entries)
+        if history_position > 0:
+            history_position -= 1
+            event.current_buffer.text = history[history_position]
+            event.current_buffer.cursor_position = len(history[history_position])
+
+    @bindings.add('down', eager=True)
+    def handle_down_arrow_history(event):
+        """Handle Down arrow key press - navigate to next history item."""
+        nonlocal history_position, original_text
+        
+        if not history:
+            return  # No history to navigate
+            
+        # Move down in history (towards newer entries)
+        if history_position < len(history):
+            history_position += 1
+            
+            if history_position == len(history):
+                # Back to original/empty text
+                event.current_buffer.text = original_text
+                event.current_buffer.cursor_position = len(original_text)
+            else:
+                event.current_buffer.text = history[history_position]
+                event.current_buffer.cursor_position = len(history[history_position])
+
 
     return bindings
 
@@ -174,12 +225,13 @@ def _create_prompt_functions():
     return get_main_prompt, get_continuation_prompt
 
 
-def _prompt_for_input(key_bindings: KeyBindings) -> str:
+def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None) -> str:
     """
     Execute the actual prompt-toolkit input session.
 
     Args:
         key_bindings: Pre-configured key bindings for the input session
+        history: List of previous inputs for history navigation
 
     Returns:
         str: Raw user input from prompt-toolkit
