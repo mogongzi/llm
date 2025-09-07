@@ -22,7 +22,7 @@ app.get("/mock", async (req, res) => {
   const filePath = req.query.file || "mock.dat";
   const delayMs = Math.max(
     0,
-    Number(req.query.delay_ms ?? req.query.delay ?? 0) || 0
+    Number(req.query.delay_ms ?? req.query.delay ?? 0) || 0,
   );
 
   // Random jitter between 20 and 100 ms
@@ -44,7 +44,7 @@ app.get("/mock", async (req, res) => {
         error: "mock_file_not_found",
         message: e?.message || String(e),
         file: filePath,
-      })}\n\n`
+      })}\n\n`,
     );
     return res.end();
   }
@@ -91,7 +91,7 @@ async function getToken() {
   const params = new URLSearchParams({ grant_type: "client_credentials" });
 
   const basic = Buffer.from(
-    `${OAUTH_CLIENT_ID}:${OAUTH_CLIENT_SECRET}`
+    `${OAUTH_CLIENT_ID}:${OAUTH_CLIENT_SECRET}`,
   ).toString("base64");
   const resp = await fetch(OAUTH_TOKEN_URL, {
     method: "POST",
@@ -118,7 +118,7 @@ app.post("/invoke", async (req, res) => {
   try {
     const access = await getToken();
     const bodyBuf = await readBody(req);
-    
+
     // Print received request to console for debugging
     if (bodyBuf) {
       try {
@@ -141,7 +141,7 @@ app.post("/invoke", async (req, res) => {
     const contentType = req.headers["content-type"] || "application/json";
     headers.set(
       "content-type",
-      Array.isArray(contentType) ? contentType.join(", ") : contentType
+      Array.isArray(contentType) ? contentType.join(", ") : contentType,
     );
 
     // forward to provider (always stream response back)
@@ -161,6 +161,14 @@ app.post("/invoke", async (req, res) => {
     // stream response (SSE/chunked/JSON)
     if (!upstreamResp.body) return res.end();
     const nodeStream = Readable.fromWeb(upstreamResp.body);
+
+    // Log response chunks to console
+    console.log("=== API Response ===");
+    nodeStream.on("data", (chunk) => {
+      console.log(chunk.toString());
+    });
+    console.log("========================");
+
     nodeStream.on("error", (e) => {
       if (!res.headersSent) res.status(502);
       try {
@@ -177,6 +185,6 @@ app.post("/invoke", async (req, res) => {
 
 app.listen(Number(PORT), HOST, () => {
   console.log(
-    `SAP AI Core Service proxy listening at http://${HOST}:${PORT}/invoke`
+    `SAP AI Core Service proxy listening at http://${HOST}:${PORT}/invoke`,
   );
 });
