@@ -214,11 +214,11 @@ def stream_and_render(
                         tool_input_buffer += value
                 elif kind == "tool_ready":
                     # Tool input complete - execute the tool and store result
-                    if tool_executor and current_tool and tool_input_buffer:
+                    if tool_executor and current_tool:
                         import json
                         try:
-                            # Parse the complete tool input
-                            tool_input = json.loads(tool_input_buffer)
+                            # Parse the complete tool input (default to empty dict if no input was streamed)
+                            tool_input = json.loads(tool_input_buffer) if tool_input_buffer else {}
                             tool_name = current_tool.get("name")
                             tool_id = current_tool.get("id")
                             
@@ -404,8 +404,13 @@ def repl(
         # Clean up history - remove any empty assistant messages that could cause API errors
         cleaned_history = []
         for msg in history:
-            if msg["role"] == "assistant" and not msg["content"].strip():
-                continue  # Skip empty assistant messages
+            if msg["role"] == "assistant":
+                # Handle both string and list content types
+                content = msg["content"]
+                if isinstance(content, str) and not content.strip():
+                    continue  # Skip empty assistant messages
+                elif isinstance(content, list) and not content:
+                    continue  # Skip empty list content
             cleaned_history.append(msg)
         
         # Only pass tools if enabled
@@ -458,11 +463,11 @@ def repl(
                 total_cost += followup_cost
             
             # Add Claude's final response to history
-            if followup_reply.strip():
+            if isinstance(followup_reply, str) and followup_reply.strip():
                 history.append({"role": "assistant", "content": followup_reply})
         else:
             # Regular response without tools
-            if reply_text.strip():
+            if isinstance(reply_text, str) and reply_text.strip():
                 history.append({"role": "assistant", "content": reply_text})
             else:
                 # This should rarely happen now
