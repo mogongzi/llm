@@ -4,11 +4,11 @@ import json
 from typing import Dict, Iterator, Optional, Tuple, List
 
 
-Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"done"|"tokens", value)
+Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"tool_start"|"tool_input_delta"|"tool_ready"|"done"|"tokens", value)
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, **_: dict
 ) -> dict:
     """Construct Bedrock/Anthropic-style chat payload.
 
@@ -27,6 +27,9 @@ def build_payload(
             "type": "enabled",
             "budget_tokens": thinking_tokens
         }
+    
+    if tools:
+        payload["tools"] = tools
 
     return payload
 
@@ -38,6 +41,9 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
     - ("model", model_name) on message_start
     - ("thinking", text_chunk) on content_block_delta.thinking_delta
     - ("text", text_chunk) on content_block_delta.text_delta
+    - ("tool_start", tool_info_json) on content_block_start with tool_use
+    - ("tool_input_delta", partial_json) on content_block_delta.input_json_delta
+    - ("tool_ready", None) on content_block_stop (tool input complete)
     - ("tokens", token_count_str) on message_stop with usage info
     - ("done", None) on message_stop or [DONE]
     """
@@ -54,6 +60,15 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             model = evt["message"].get("model")
             if model:
                 yield ("model", model)
+        elif e_type == "content_block_start":
+            # Handle tool_use block start - store for later completion
+            content_block = evt.get("content_block", {})
+            if content_block.get("type") == "tool_use":
+                # Store tool info, input will be streamed separately
+                yield ("tool_start", json.dumps({
+                    "id": content_block.get("id"),
+                    "name": content_block.get("name")
+                }))
         elif e_type == "content_block_delta":
             delta = evt.get("delta", {})
             if delta.get("type") == "thinking_delta":
@@ -64,6 +79,14 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                 text = delta.get("text", "")
                 if text:
                     yield ("text", text)
+            elif delta.get("type") == "input_json_delta":
+                # Handle streaming tool input JSON
+                partial_json = delta.get("partial_json", "")
+                if partial_json:
+                    yield ("tool_input_delta", partial_json)
+        elif e_type == "content_block_stop":
+            # Tool input streaming is complete, signal to execute
+            yield ("tool_ready", None)
         elif e_type == "message_stop":
             # Extract token usage and cost if available
             usage = evt.get("amazon-bedrock-invocationMetrics") or evt.get("usage")

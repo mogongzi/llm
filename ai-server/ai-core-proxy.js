@@ -118,6 +118,20 @@ app.post("/invoke", async (req, res) => {
   try {
     const access = await getToken();
     const bodyBuf = await readBody(req);
+    
+    // Print received request to console for debugging
+    if (bodyBuf) {
+      try {
+        const requestData = JSON.parse(bodyBuf.toString());
+        console.log("=== Received Request ===");
+        console.log(JSON.stringify(requestData, null, 2));
+        console.log("=====================");
+      } catch (e) {
+        console.log("=== Raw Request Body ===");
+        console.log(bodyBuf.toString());
+        console.log("=====================");
+      }
+    }
 
     // prepare headers
     const headers = new Headers();

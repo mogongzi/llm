@@ -32,6 +32,8 @@ from sse_client import iter_sse_lines
 from providers import get_provider
 from render.markdown_live import MarkdownStream
 from simple_pt_input import get_multiline_input
+from tools.definitions import AVAILABLE_TOOLS
+from tools.executor import ToolExecutor
 
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
@@ -137,7 +139,8 @@ def stream_and_render(
     timeout: float = 30.0,
     mock_file: Optional[str] = None,
     show_rule: bool = True,
-) -> Tuple[str, int, float]:
+    tool_executor: Optional[ToolExecutor] = None,
+) -> Tuple[str, int, float, List[dict]]:
     """Stream SSE and render incrementally.
 
     When use_mock=True, perform a GET to an SSE /mock endpoint and pass the prompt via ?text=...
@@ -146,7 +149,12 @@ def stream_and_render(
     ms = MarkdownStream(live_window=live_window)
     buf: List[str] = []
     model_name: Optional[str] = None
-
+    
+    # Tool call state
+    current_tool = None
+    tool_input_buffer = ""
+    tool_calls_made = []  # Collect all tool calls in this turn
+    
     global _ABORT
     _ABORT = False
     try:
@@ -188,6 +196,59 @@ def stream_and_render(
                     ms.stop_waiting()
                     buf.append(value or "")
                     ms.add_response(value or "")
+                elif kind == "tool_start":
+                    # Tool use starting - store tool info
+                    ms.stop_waiting()
+                    if tool_executor and value:
+                        import json
+                        try:
+                            # Store current tool info and initialize input buffer
+                            current_tool = json.loads(value)
+                            tool_input_buffer = ""
+                            console.print(f"[yellow]🔧 Using {current_tool.get('name')} tool...[/yellow]")
+                        except json.JSONDecodeError:
+                            console.print(f"[red]Error: Invalid tool start format[/red]")
+                elif kind == "tool_input_delta":
+                    # Accumulate streaming tool input
+                    if value:
+                        tool_input_buffer += value
+                elif kind == "tool_ready":
+                    # Tool input complete - execute the tool and store result
+                    if tool_executor and current_tool and tool_input_buffer:
+                        import json
+                        try:
+                            # Parse the complete tool input
+                            tool_input = json.loads(tool_input_buffer)
+                            tool_name = current_tool.get("name")
+                            tool_id = current_tool.get("id")
+                            
+                            # Execute the tool
+                            result = tool_executor.execute_tool(tool_name, tool_input)
+                            
+                            # Display tool result to user
+                            if "error" in result:
+                                console.print(f"[red]Tool error: {result['error']}[/red]")
+                                tool_result_content = result['content']
+                            else:
+                                console.print(f"[green]✓ {result['content']}[/green]")
+                                tool_result_content = result['content']
+                            
+                            # Store the complete tool call for sending back to Claude
+                            tool_calls_made.append({
+                                "tool_call": {
+                                    "id": tool_id,
+                                    "name": tool_name,
+                                    "input": tool_input
+                                },
+                                "result": tool_result_content
+                            })
+                            
+                        except json.JSONDecodeError:
+                            console.print(f"[red]Error: Invalid tool input JSON: {tool_input_buffer}[/red]")
+                        finally:
+                            # Clean up for next tool
+                            current_tool = None
+                            tool_input_buffer = ""
                 elif kind == "tokens":
                     # Parse token info: "tokens|input_tokens|output_tokens|cost"
                     if value and "|" in value:
@@ -195,20 +256,82 @@ def stream_and_render(
                         if len(parts) >= 4:
                             total_tokens = int(parts[0]) if parts[0].isdigit() else 0
                             cost = float(parts[3]) if parts[3] else 0.0
-                            return "".join(buf), total_tokens, cost
+                            return "".join(buf), total_tokens, cost, tool_calls_made
                     # Fallback for old format
                     tokens = int(value) if value and value.isdigit() else 0
-                    return "".join(buf), tokens, 0.0
+                    return "".join(buf), tokens, 0.0, tool_calls_made
                 elif kind == "done":
                     break
     except RequestException as e:
         console.print(f"[red]Network error[/red]: {e}")
+        # Try to get more details from the response
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_text = e.response.text
+                console.print(f"[red]Response body[/red]: {error_text}")
+            except:
+                console.print(f"[red]Status code[/red]: {e.response.status_code}")
+    except Exception as e:
+        console.print(f"[red]Unexpected error[/red]: {e}")
+        import traceback
+        console.print(f"[red]Details[/red]: {traceback.format_exc()}")
     finally:
         ms.update("".join(buf), final=True)
         if _ABORT:
             console.print("[dim]Aborted[/dim]")
-    return "".join(buf), 0, 0.0
+    return "".join(buf), 0, 0.0, tool_calls_made
 
+
+# ---------------- Tool Result Handling ----------------
+
+def format_tool_messages(tool_calls_made: List[dict]) -> List[dict]:
+    """
+    Format tool calls and results into Anthropic API message format.
+    
+    Args:
+        tool_calls_made: List of tool calls with results
+        
+    Returns:
+        List of properly formatted messages for the conversation
+    """
+    if not tool_calls_made:
+        return []
+    
+    messages = []
+    
+    # Create assistant message with tool calls
+    tool_use_blocks = []
+    for tool_data in tool_calls_made:
+        tool_call = tool_data["tool_call"]
+        tool_use_blocks.append({
+            "type": "tool_use",
+            "id": tool_call["id"], 
+            "name": tool_call["name"],
+            "input": tool_call["input"]
+        })
+    
+    messages.append({
+        "role": "assistant",
+        "content": tool_use_blocks
+    })
+    
+    # Create user message with tool results  
+    tool_result_blocks = []
+    for tool_data in tool_calls_made:
+        tool_call = tool_data["tool_call"]
+        result = tool_data["result"]
+        tool_result_blocks.append({
+            "type": "tool_result",
+            "tool_use_id": tool_call["id"],
+            "content": result
+        })
+    
+    messages.append({
+        "role": "user", 
+        "content": tool_result_blocks
+    })
+    
+    return messages
 
 # ---------------- CLI / REPL ----------------
 
@@ -233,6 +356,10 @@ def repl(
     total_cost = 0.0
     max_tokens_limit = 200000  # Default limit, can be made configurable
     thinking_mode = False  # Track thinking mode state
+    tools_enabled = False  # Track tools mode state
+    
+    # Initialize tool executor
+    tool_executor = ToolExecutor()
 
     while True:
         try:
@@ -258,26 +385,33 @@ def repl(
 
             # Extract user messages from conversation history for navigation
             user_history = [msg["content"] for msg in history if msg["role"] == "user"]
-            user, use_thinking, thinking_mode = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode, user_history)
+            user, use_thinking, thinking_mode, tools_enabled = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode, user_history, tools_enabled)
             if user == "__EXIT__":
                 console.print("[dim]Bye![/dim]")
                 return 0
             if user is None:
                 continue  # Command executed or empty input
-            user = user.strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Bye![/dim]")
             return 0
-        if not user:
-            continue
         if user.lower() in {"exit", "quit"}:
             console.print("[dim]Bye![/dim]")
             return 0
 
         # Conversation: append user message and send full history
         history.append({"role": "user", "content": user})
-        payload = provider.build_payload(history, model=model, max_tokens=max_tokens, thinking=use_thinking)
-        reply_text, tokens_used, cost_used = stream_and_render(
+        
+        # Clean up history - remove any empty assistant messages that could cause API errors
+        cleaned_history = []
+        for msg in history:
+            if msg["role"] == "assistant" and not msg["content"].strip():
+                continue  # Skip empty assistant messages
+            cleaned_history.append(msg)
+        
+        # Only pass tools if enabled
+        tools_param = AVAILABLE_TOOLS if tools_enabled else None
+        payload = provider.build_payload(cleaned_history, model=model, max_tokens=max_tokens, thinking=use_thinking, tools=tools_param)
+        reply_text, tokens_used, cost_used, tool_calls_made = stream_and_render(
             url,
             payload,
             mapper=provider.map_events,
@@ -286,6 +420,7 @@ def repl(
             timeout=timeout,
             mock_file=mock_file,
             show_rule=show_rule,
+            tool_executor=tool_executor,
         )
         # Update token and cost tracking
         if tokens_used > 0:
@@ -293,8 +428,45 @@ def repl(
         if cost_used > 0:
             total_cost += cost_used
 
-        # Append assistant reply to history
-        history.append({"role": "assistant", "content": reply_text})
+        # Handle tool calls if any were made
+        if tool_calls_made:
+            # Add tool call messages to history
+            tool_messages = format_tool_messages(tool_calls_made)
+            history.extend(tool_messages)
+            
+            # Send tool results back to Claude to get final response
+            console.print("[dim]Getting Claude's response to tool results...[/dim]")
+            
+            # Make follow-up request with tool results
+            followup_payload = provider.build_payload(history, model=model, max_tokens=max_tokens, thinking=use_thinking, tools=tools_param)
+            followup_reply, followup_tokens, followup_cost, _ = stream_and_render(
+                url,
+                followup_payload, 
+                mapper=provider.map_events,
+                live_window=live_window,
+                use_mock=use_mock,
+                timeout=timeout,
+                mock_file=mock_file,
+                show_rule=False,  # Don't show rule again
+                tool_executor=tool_executor,
+            )
+            
+            # Update tracking for follow-up request
+            if followup_tokens > 0:
+                total_tokens_used += followup_tokens
+            if followup_cost > 0:
+                total_cost += followup_cost
+            
+            # Add Claude's final response to history
+            if followup_reply.strip():
+                history.append({"role": "assistant", "content": followup_reply})
+        else:
+            # Regular response without tools
+            if reply_text.strip():
+                history.append({"role": "assistant", "content": reply_text})
+            else:
+                # This should rarely happen now
+                console.print("[dim]Note: Empty response received[/dim]")
 
 
 def main(argv: Optional[list[str]] = None) -> int:
