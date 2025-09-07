@@ -201,7 +201,7 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
     else:
         tools_part = "/tools functions"
     
-    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    Esc/Ctrl+C=cancel"
+    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    /clear history    Esc/Ctrl+C=cancel"
 
     # Only show instructions if requested
     if not show_instructions:
@@ -310,6 +310,11 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
         else:
             console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
         return None, False, thinking_mode, not tools_enabled  # Toggle tools mode
+    
+    # Handle clear command
+    elif cleaned_input == '/clear':
+        console.print("[green]Chat history cleared.[/green]")
+        return "__CLEAR__", False, thinking_mode, tools_enabled  # Special clear signal
 
     # Handle legacy /think <message> format for backward compatibility
     elif cleaned_input.startswith('/think '):
