@@ -33,8 +33,9 @@ def get_multiline_input(
     prompt_style: str = "bold green",
     token_info: Optional[str] = None,
     thinking_mode: bool = False,
-    history: Optional[list[str]] = None
-) -> tuple[Optional[str], bool, bool]:
+    history: Optional[list[str]] = None,
+    tools_enabled: bool = False
+) -> tuple[Optional[str], bool, bool, bool]:
     """
     Get multi-line input from user with enhanced prompt-toolkit interface.
 
@@ -52,9 +53,10 @@ def get_multiline_input(
         token_info: Optional token usage string to display (e.g., "1.2k/200k (0.6%)")
         thinking_mode: Current thinking mode state (ON/OFF)
         history: Optional list of previous user inputs for up/down navigation
+        tools_enabled: Current tools mode state (ON/OFF)
 
     Returns:
-        tuple[Optional[str], bool, bool]: (user_input, use_thinking, new_thinking_mode)
+        tuple[Optional[str], bool, bool, bool]: (user_input, use_thinking, new_thinking_mode, new_tools_enabled)
 
     Raises:
         No exceptions are raised - all errors are caught and handled gracefully
@@ -66,15 +68,22 @@ def get_multiline_input(
         ...     print(f"User entered: {user_input}")
     """
     key_bindings = _create_key_bindings(history or [])
-    _display_usage_instructions(console, token_info, thinking_mode)
+    
+    # Show instructions with token info before prompting
+    _display_usage_instructions(console, token_info, thinking_mode, tools_enabled)
 
     try:
         user_input = _prompt_for_input(key_bindings, history)
-        return _process_user_input(user_input, console, thinking_mode)
+        
+        # Check for empty input immediately to avoid any visual artifacts
+        if not user_input or not user_input.strip():
+            return None, False, thinking_mode, tools_enabled
+            
+        return _process_user_input(user_input, console, thinking_mode, tools_enabled)
 
     except (KeyboardInterrupt, EOFError):
         _display_cancellation_message(console)
-        return "__EXIT__", False, thinking_mode  # Special exit signal
+        return "__EXIT__", False, thinking_mode, tools_enabled  # Special exit signal
 
 
 def _create_key_bindings(history: list[str] = None) -> KeyBindings:
@@ -102,8 +111,12 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
 
     @bindings.add('enter', eager=True)
     def handle_enter_key_submission(event):
-        """Handle Enter key press - submit the current input."""
-        event.app.exit(result=event.current_buffer.text)
+        """Handle Enter key press - submit the current input only if non-empty."""
+        current_text = event.current_buffer.text
+        # Only submit if there's actual content (not just whitespace)
+        if current_text and current_text.strip():
+            event.app.exit(result=current_text)
+        # If empty or whitespace only, do nothing (don't exit, don't add newline)
 
     @bindings.add('c-j', eager=True)
     def handle_ctrl_j_new_line(event):
@@ -162,7 +175,7 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     return bindings
 
 
-def _display_usage_instructions(console: Console, token_info: Optional[str] = None, thinking_mode: bool = False) -> None:
+def _display_usage_instructions(console: Console, token_info: Optional[str] = None, thinking_mode: bool = False, tools_enabled: bool = False, show_instructions: bool = True) -> None:
     """
     Display usage instructions to help user understand key bindings.
 
@@ -170,11 +183,32 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
         console: Rich console instance for styled output
         token_info: Optional token usage string to display on the right side
         thinking_mode: Whether thinking mode is currently enabled
+        tools_enabled: Whether tools mode is currently enabled
+        show_instructions: Whether to show the usage instructions
     """
+    # Build instructions with status indicators
+    base_instructions = "↵ send    Ctrl+J newline"
+    
+    # Add thinking mode status
     if thinking_mode:
-        instructions = "↵ send    Ctrl+J newline    /think reasoning [ON]    Esc/Ctrl+C=cancel"
+        thinking_part = "/think reasoning [ON]"
     else:
-        instructions = "↵ send    Ctrl+J newline    /think reasoning    Esc/Ctrl+C=cancel"
+        thinking_part = "/think reasoning"
+    
+    # Add tools mode status  
+    if tools_enabled:
+        tools_part = "/tools functions [ON]"
+    else:
+        tools_part = "/tools functions"
+    
+    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    Esc/Ctrl+C=cancel"
+
+    # Only show instructions if requested
+    if not show_instructions:
+        # Show only token info if available
+        if token_info:
+            console.print(f"[dim]Tokens: {token_info}[/dim]")
+        return
 
     if token_info:
         # Calculate padding to right-align token info
@@ -245,7 +279,7 @@ def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None) -> s
     )
 
 
-def _process_user_input(user_input: str, console: Console, thinking_mode: bool) -> tuple[Optional[str], bool, bool]:
+def _process_user_input(user_input: str, console: Console, thinking_mode: bool, tools_enabled: bool) -> tuple[Optional[str], bool, bool, bool]:
     """
     Process the raw user input and handle special commands.
 
@@ -253,13 +287,12 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool) 
         user_input: Raw input string from prompt-toolkit
         console: Rich console instance for any needed output
         thinking_mode: Current thinking mode state
+        tools_enabled: Current tools mode state
 
     Returns:
-        tuple[Optional[str], bool, bool]: (processed_input, use_thinking, new_thinking_mode)
+        tuple[Optional[str], bool, bool, bool]: (processed_input, use_thinking, new_thinking_mode, new_tools_enabled)
     """
-    if not user_input:
-        return None, False, thinking_mode
-
+    # Input is guaranteed to be non-empty by caller
     cleaned_input = user_input.strip()
 
     # Handle thinking mode toggle command
@@ -268,23 +301,31 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool) 
             console.print("[dim]Thinking mode disabled.[/dim]")
         else:
             console.print("[green]Thinking mode enabled. All messages will now show reasoning.[/green]")
-        return None, False, not thinking_mode  # Toggle thinking mode
+        return None, False, not thinking_mode, tools_enabled  # Toggle thinking mode
+    
+    # Handle tools mode toggle command
+    elif cleaned_input == '/tools':
+        if tools_enabled:
+            console.print("[dim]Tools disabled. Claude will not use function calls.[/dim]")
+        else:
+            console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
+        return None, False, thinking_mode, not tools_enabled  # Toggle tools mode
 
     # Handle legacy /think <message> format for backward compatibility
     elif cleaned_input.startswith('/think '):
         actual_message = cleaned_input[7:].strip()  # Remove "/think " prefix
         if actual_message:
             console.print("[dim]Tip: Use /think to toggle thinking mode on/off, then just type your message.[/dim]")
-            return actual_message, True, thinking_mode
+            return actual_message, True, thinking_mode, tools_enabled
         else:
             console.print("[yellow]Use /think to toggle thinking mode on/off, or /think <message> for one-time thinking.[/yellow]")
-            return None, False, thinking_mode
+            return None, False, thinking_mode, tools_enabled
 
     # Regular message - use current thinking mode
     if cleaned_input:
-        return cleaned_input, thinking_mode, thinking_mode
+        return cleaned_input, thinking_mode, thinking_mode, tools_enabled
     else:
-        return None, False, thinking_mode
+        return None, False, thinking_mode, tools_enabled
 
 
 def _display_cancellation_message(console: Console) -> None:
