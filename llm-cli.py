@@ -205,7 +205,7 @@ def stream_and_render(
                             # Store current tool info and initialize input buffer
                             current_tool = json.loads(value)
                             tool_input_buffer = ""
-                            console.print(f"[yellow]🔧 Using {current_tool.get('name')} tool...[/yellow]")
+                            console.print(f"[yellow]⚙ Using {current_tool.get('name')} tool...[/yellow]")
                         except json.JSONDecodeError:
                             console.print(f"[red]Error: Invalid tool start format[/red]")
                 elif kind == "tool_input_delta":
@@ -384,11 +384,15 @@ def repl(
                 token_display = None
 
             # Extract user messages from conversation history for navigation
-            user_history = [msg["content"] for msg in history if msg["role"] == "user"]
+            user_history = [msg["content"] for msg in history if msg["role"] == "user" and isinstance(msg["content"], str)]
             user, use_thinking, thinking_mode, tools_enabled = get_multiline_input(console, PROMPT_STYLE, token_display, thinking_mode, user_history, tools_enabled)
             if user == "__EXIT__":
                 console.print("[dim]Bye![/dim]")
                 return 0
+            if user == "__CLEAR__":
+                # Clear conversation history but keep token/cost counters
+                history = []
+                continue
             if user is None:
                 continue  # Command executed or empty input
         except (EOFError, KeyboardInterrupt):
