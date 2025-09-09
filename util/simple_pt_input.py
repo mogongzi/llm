@@ -68,17 +68,17 @@ def get_multiline_input(
         ...     print(f"User entered: {user_input}")
     """
     key_bindings = _create_key_bindings(history or [])
-    
+
     # Show instructions with token info before prompting
     _display_usage_instructions(console, token_info, thinking_mode, tools_enabled)
 
     try:
         user_input = _prompt_for_input(key_bindings, history)
-        
+
         # Check for empty input immediately to avoid any visual artifacts
         if not user_input or not user_input.strip():
             return None, False, thinking_mode, tools_enabled
-            
+
         return _process_user_input(user_input, console, thinking_mode, tools_enabled)
 
     except (KeyboardInterrupt, EOFError):
@@ -101,11 +101,11 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
         KeyBindings: Configured key bindings object for prompt-toolkit
     """
     bindings = KeyBindings()
-    
+
     # History navigation state
     if history is None:
         history = []
-    
+
     history_position = len(history)  # Start at end (no selection)
     original_text = ""  # Store original text when navigating
 
@@ -137,14 +137,14 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     def handle_up_arrow_history(event):
         """Handle Up arrow key press - navigate to previous history item."""
         nonlocal history_position, original_text
-        
+
         if not history:
             return  # No history to navigate
-            
+
         # Save original text when first navigating
         if history_position == len(history):
             original_text = event.current_buffer.text
-            
+
         # Move up in history (towards older entries)
         if history_position > 0:
             history_position -= 1
@@ -155,14 +155,14 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     def handle_down_arrow_history(event):
         """Handle Down arrow key press - navigate to next history item."""
         nonlocal history_position, original_text
-        
+
         if not history:
             return  # No history to navigate
-            
+
         # Move down in history (towards newer entries)
         if history_position < len(history):
             history_position += 1
-            
+
             if history_position == len(history):
                 # Back to original/empty text
                 event.current_buffer.text = original_text
@@ -188,20 +188,20 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
     """
     # Build instructions with status indicators
     base_instructions = "↵ send    Ctrl+J newline"
-    
+
     # Add thinking mode status
     if thinking_mode:
         thinking_part = "/think reasoning [ON]"
     else:
         thinking_part = "/think reasoning"
-    
-    # Add tools mode status  
+
+    # Add tools mode status
     if tools_enabled:
         tools_part = "/tools functions [ON]"
     else:
         tools_part = "/tools functions"
-    
-    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    /clear history    Esc/Ctrl+C=cancel"
+
+    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    Esc/Ctrl+C=cancel"
 
     # Only show instructions if requested
     if not show_instructions:
@@ -302,7 +302,7 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
         else:
             console.print("[green]Thinking mode enabled. All messages will now show reasoning.[/green]")
         return None, False, not thinking_mode, tools_enabled  # Toggle thinking mode
-    
+
     # Handle tools mode toggle command
     elif cleaned_input == '/tools':
         if tools_enabled:
@@ -310,7 +310,7 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
         else:
             console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
         return None, False, thinking_mode, not tools_enabled  # Toggle tools mode
-    
+
     # Handle clear command
     elif cleaned_input == '/clear':
         console.print("[green]Chat history cleared.[/green]")
@@ -341,71 +341,3 @@ def _display_cancellation_message(console: Console) -> None:
         console: Rich console instance for styled output
     """
     console.print("\n[dim]Cancelled[/dim]")
-
-
-
-
-def _run_interactive_test() -> None:
-    """
-    Run an interactive test of the multi-line input system.
-
-    This function demonstrates the input system's capabilities and allows
-    manual testing of all features including normal input and multi-line input.
-    """
-    console = Console()
-
-    _display_test_header(console)
-    _display_test_instructions(console)
-
-    while True:
-        console.print("[yellow]Enter your message (or 'exit' to quit):[/yellow]")
-
-        result = get_multiline_input(console)
-
-        if result is None:
-            console.print("[dim]Goodbye![/dim]")
-            break
-
-        if result.lower() in ["exit", "quit"]:
-            console.print("[dim]Goodbye![/dim]")
-            break
-
-        _display_test_results(console, result)
-
-
-def _display_test_header(console: Console) -> None:
-    """Display the test application header."""
-    console.print("[bold cyan]Multi-line Input System Test[/bold cyan]")
-
-
-def _display_test_instructions(console: Console) -> None:
-    """Display comprehensive usage instructions for testing."""
-    console.print("[dim]Available features:[/dim]")
-    console.print("• Enter = Submit message")
-    console.print("• Ctrl+J = Add new line")
-    console.print("• Esc or Ctrl+C = Cancel current input")
-    console.print("• Type 'exit' or 'quit' to end test")
-    console.print()
-
-
-def _display_test_results(console: Console, user_input: str) -> None:
-    """
-    Display the results of user input in a formatted way.
-
-    Args:
-        console: Rich console instance for styled output
-        user_input: The input string to display
-    """
-    console.print()
-    console.print("[cyan]Raw input (Python representation):[/cyan]")
-    console.print(f"[yellow]{repr(user_input)}[/yellow]")
-    console.print()
-    console.print("[cyan]Formatted output:[/cyan]")
-    console.print(user_input)
-    console.print()
-    console.print("[dim]" + "="*50 + "[/dim]")
-    console.print()
-
-
-if __name__ == "__main__":
-    _run_interactive_test()

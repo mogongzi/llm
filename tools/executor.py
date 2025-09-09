@@ -10,7 +10,7 @@ import json
 import math
 import os
 import re
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -178,7 +178,7 @@ class ToolExecutor:
             # For simplicity, just use local time or UTC
             # A full implementation would use pytz for timezone handling
             if timezone.upper() == "UTC":
-                now = datetime.utcnow()
+                now = datetime.now(UTC)
                 tz_info = "UTC"
             else:
                 now = datetime.now()
