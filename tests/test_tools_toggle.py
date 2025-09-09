@@ -2,13 +2,19 @@
 """
 Test script for /tools command functionality.
 """
+try:
+    import pytest
+except ImportError:
+    pytest = None
 
-def mock_console_print(message):
-    print(f"CONSOLE: {message}")
 
 class MockConsole:
+    def __init__(self):
+        self.messages = []
+    
     def print(self, message):
-        mock_console_print(message)
+        self.messages.append(message)
+
 
 def test_tools_command_logic():
     """Test the /tools command logic without imports."""
@@ -23,40 +29,41 @@ def test_tools_command_logic():
                 console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
             return not tools_enabled  # Toggle tools mode
         return tools_enabled
-
-    print("=== Testing /tools Command Logic ===")
     
     # Test enabling tools
     tools_enabled = False
-    print(f"Initial state: tools_enabled = {tools_enabled}")
     tools_enabled = process_tools_command('/tools', tools_enabled, console)
-    print(f"After /tools: tools_enabled = {tools_enabled}")
-    print()
+    assert tools_enabled is True
+    assert "[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]" in console.messages
     
     # Test disabling tools
-    print(f"Current state: tools_enabled = {tools_enabled}")
+    console.messages.clear()
     tools_enabled = process_tools_command('/tools', tools_enabled, console)
-    print(f"After /tools: tools_enabled = {tools_enabled}")
-    print()
+    assert tools_enabled is False
+    assert "[dim]Tools disabled. Claude will not use function calls.[/dim]" in console.messages
+
 
 def test_conditional_tools_parameter():
     """Test conditional tools parameter logic."""
-    print("=== Testing Conditional Tools Parameter ===")
-    
     AVAILABLE_TOOLS = ["tool1", "tool2", "tool3"]  # Mock tools
     
     # Test with tools enabled
     tools_enabled = True
     tools_param = AVAILABLE_TOOLS if tools_enabled else None
-    print(f"tools_enabled = {tools_enabled} -> tools_param = {tools_param}")
+    assert tools_param == AVAILABLE_TOOLS
     
     # Test with tools disabled
     tools_enabled = False  
     tools_param = AVAILABLE_TOOLS if tools_enabled else None
-    print(f"tools_enabled = {tools_enabled} -> tools_param = {tools_param}")
+    assert tools_param is None
+
 
 if __name__ == "__main__":
-    test_tools_command_logic()
-    print()
-    test_conditional_tools_parameter()
-    print("\n✅ All logic tests passed!")
+    if pytest:
+        pytest.main([__file__])
+    else:
+        # Run tests manually
+        print("Running tests without pytest...")
+        test_tools_command_logic()
+        test_conditional_tools_parameter()
+        print("All tests passed!")

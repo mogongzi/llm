@@ -2,15 +2,19 @@
 """
 Test script for empty input handling.
 """
+import pytest
+
+
+class MockConsole:
+    def __init__(self):
+        self.messages = []
+    
+    def print(self, message):
+        self.messages.append(message)
+
 
 def test_empty_input_processing():
     """Test that empty input is handled correctly."""
-    
-    # Mock console for testing
-    class MockConsole:
-        def print(self, message):
-            print(f"CONSOLE: {message}")
-    
     # Test the input processing logic
     def process_user_input(user_input, thinking_mode=False, tools_enabled=False):
         """Simplified version of the input processing logic."""
@@ -28,8 +32,6 @@ def test_empty_input_processing():
         # Regular processing
         return cleaned_input, thinking_mode, thinking_mode, tools_enabled
     
-    print("=== Empty Input Handling Test ===")
-    
     # Test cases
     test_cases = [
         ("", "Empty string"),
@@ -43,25 +45,18 @@ def test_empty_input_processing():
         result = process_user_input(input_text)
         processed_input = result[0]
         
-        print(f"{description:20} | Input: '{input_text}' -> Result: {processed_input}")
-        
         # Verify empty inputs return None
         if not input_text.strip():
             assert processed_input is None, f"Empty input should return None, got {processed_input}"
         else:
             assert processed_input is not None, f"Valid input should not return None"
-    
-    print("✅ All empty input tests passed!")
+
 
 def test_main_loop_logic():
     """Test the main loop logic for handling None returns."""
-    
-    print("\n=== Main Loop Logic Test ===")
-    
     # Simulate the main loop logic
     def simulate_main_loop_iteration(user_input):
         """Simulate one iteration of the main loop."""
-        
         # This simulates: user, use_thinking, thinking_mode, tools_enabled = get_multiline_input(...)
         if not user_input or not user_input.strip():
             user = None
@@ -88,12 +83,24 @@ def test_main_loop_logic():
     
     for input_text, expected in test_cases:
         result = simulate_main_loop_iteration(input_text)
-        print(f"Input: '{input_text}' -> {result}")
         assert result == expected, f"Expected {expected}, got {result}"
+
+
+def test_whitespace_handling():
+    """Test various whitespace scenarios."""
+    def handle_whitespace(text):
+        if not text or not text.strip():
+            return None
+        return text.strip()
     
-    print("✅ Main loop logic test passed!")
+    # Test different whitespace scenarios
+    assert handle_whitespace("") is None
+    assert handle_whitespace("   ") is None
+    assert handle_whitespace("\n\t  ") is None
+    assert handle_whitespace("hello") == "hello"
+    assert handle_whitespace("  hello  ") == "hello"
+    assert handle_whitespace("\n  hello world  \t") == "hello world"
+
 
 if __name__ == "__main__":
-    test_empty_input_processing()
-    test_main_loop_logic()
-    print("\n🎉 Empty input handling is working correctly!")
+    pytest.main([__file__])
