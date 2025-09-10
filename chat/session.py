@@ -15,7 +15,7 @@ class ChatSession:
     
     def __init__(self, url: str, provider, model: Optional[str], max_tokens: int, 
                  live_window: int, use_mock: bool, timeout: float, mock_file: Optional[str],
-                 show_rule: bool, tool_executor):
+                 show_rule: bool, tool_executor, context_manager=None):
         self.url = url
         self.provider = provider
         self.model = model
@@ -26,14 +26,16 @@ class ChatSession:
         self.mock_file = mock_file
         self.show_rule = show_rule
         self.tool_executor = tool_executor
+        self.context_manager = context_manager
     
     def send_message(self, history: List[dict], use_thinking: bool, tools_enabled: bool, 
                     available_tools, stream_and_render_func) -> Tuple[str, int, float, List[dict]]:
         """Send a message and handle the complete request/response cycle including tools."""
-        # Build request payload with conditional tool support
+        # Build request payload with conditional tool support and context injection
         tools_param = available_tools if tools_enabled else None
+        context_content = self.context_manager.format_context_for_llm() if self.context_manager else None
         payload = self.provider.build_payload(history, model=self.model, max_tokens=self.max_tokens, 
-                                             thinking=use_thinking, tools=tools_param)
+                                             thinking=use_thinking, tools=tools_param, context_content=context_content)
         
         # Stream initial response and capture any tool calls
         reply_text, tokens_used, cost_used, tool_calls_made = stream_and_render_func(
@@ -57,8 +59,9 @@ class ChatSession:
         
         # Follow-up request includes tool results in context
         tools_param = available_tools if tools_enabled else None
+        context_content = self.context_manager.format_context_for_llm() if self.context_manager else None
         followup_payload = self.provider.build_payload(history, model=self.model, max_tokens=self.max_tokens, 
-                                                      thinking=use_thinking, tools=tools_param)
+                                                      thinking=use_thinking, tools=tools_param, context_content=context_content)
         
         followup_reply, followup_tokens, followup_cost, _ = stream_and_render_func(
             self.url,

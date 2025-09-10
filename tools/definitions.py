@@ -21,7 +21,7 @@ AVAILABLE_TOOLS: List[Dict[str, Any]] = [
                     "description": "The city name or location to get weather for (e.g., 'Paris', 'Tokyo', 'New York')"
                 },
                 "units": {
-                    "type": "string", 
+                    "type": "string",
                     "enum": ["celsius", "fahrenheit"],
                     "description": "Temperature unit preference (defaults to celsius if not specified)"
                 }
@@ -68,10 +68,10 @@ AVAILABLE_TOOLS: List[Dict[str, Any]] = [
 def get_tool_by_name(name: str) -> Dict[str, Any] | None:
     """
     Get a tool definition by name.
-    
+
     Args:
         name: The tool name to look up
-        
+
     Returns:
         Tool definition dictionary or None if not found
     """
@@ -84,7 +84,7 @@ def get_tool_by_name(name: str) -> Dict[str, Any] | None:
 def get_tool_names() -> List[str]:
     """
     Get a list of all available tool names.
-    
+
     Returns:
         List of tool names
     """

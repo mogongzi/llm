@@ -41,6 +41,8 @@ from chat.conversation import ConversationManager
 from chat.usage_tracker import UsageTracker
 from chat.session import ChatSession
 from chat.tool_workflow import process_tool_execution
+from context.context_manager import ContextManager
+from util.path_browser import PathBrowser
 
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
@@ -304,6 +306,8 @@ def repl(
     conversation = ConversationManager()
     usage = UsageTracker(max_tokens_limit=200000)
     tool_executor = ToolExecutor()
+    context_manager = ContextManager()
+    path_browser = PathBrowser()
     session = ChatSession(
         url=url,
         provider=provider,
@@ -314,7 +318,8 @@ def repl(
         timeout=timeout,
         mock_file=mock_file,
         show_rule=show_rule,
-        tool_executor=tool_executor
+        tool_executor=tool_executor,
+        context_manager=context_manager
     )
 
     # Track UI state that persists across interactions
@@ -324,9 +329,11 @@ def repl(
     while True:
         try:
             # Get user input with usage display and history navigation
+            context_status = context_manager.get_status_summary()
+            display_string = f"{usage.get_display_string()} • {context_status}"
             user_input, use_thinking, thinking_mode, tools_enabled = get_multiline_input(
-                console, PROMPT_STYLE, usage.get_display_string(), thinking_mode,
-                conversation.get_user_history(), tools_enabled
+                console, PROMPT_STYLE, display_string, thinking_mode,
+                conversation.get_user_history(), tools_enabled, context_manager
             )
 
             # Handle exit conditions
@@ -335,7 +342,7 @@ def repl(
                 return 0
 
             # Handle special commands
-            if handle_special_commands(user_input, conversation, console):
+            if handle_special_commands(user_input, conversation, console, context_manager, path_browser):
                 continue
 
         except (EOFError, KeyboardInterrupt):
