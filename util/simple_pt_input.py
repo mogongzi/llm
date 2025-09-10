@@ -21,8 +21,13 @@ from typing import Optional
 
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.application.current import get_app
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.completion import merge_completers
+from prompt_toolkit.styles import Style
 from rich.console import Console
+from util.at_completer import AtCommandCompleter
 
 # Constants for visual consistency
 CURSOR_CHARACTER = "▌"
@@ -34,7 +39,8 @@ def get_multiline_input(
     token_info: Optional[str] = None,
     thinking_mode: bool = False,
     history: Optional[list[str]] = None,
-    tools_enabled: bool = False
+    tools_enabled: bool = False,
+    context_manager=None
 ) -> tuple[Optional[str], bool, bool, bool]:
     """
     Get multi-line input from user with enhanced prompt-toolkit interface.
@@ -54,6 +60,7 @@ def get_multiline_input(
         thinking_mode: Current thinking mode state (ON/OFF)
         history: Optional list of previous user inputs for up/down navigation
         tools_enabled: Current tools mode state (ON/OFF)
+        context_manager: Optional context manager for @ command autocompletion
 
     Returns:
         tuple[Optional[str], bool, bool, bool]: (user_input, use_thinking, new_thinking_mode, new_tools_enabled)
@@ -73,10 +80,27 @@ def get_multiline_input(
     _display_usage_instructions(console, token_info, thinking_mode, tools_enabled)
 
     try:
-        user_input = _prompt_for_input(key_bindings, history)
+        user_input = _prompt_for_input(key_bindings, history, context_manager)
 
         # Check for empty input immediately to avoid any visual artifacts
-        if not user_input or not user_input.strip():
+        # But allow @ commands through (including just "@")
+        if not user_input:
+            return None, False, thinking_mode, tools_enabled
+
+        stripped_input = user_input.strip()
+        # Allow @ commands through, even if just "@"
+        if stripped_input.startswith('@'):
+            # Check if this is a complete file path (from autocomplete selection)
+            if _is_complete_at_command(stripped_input, context_manager):
+                # Automatically add file to context and return empty to continue input
+                _handle_at_selection(stripped_input, context_manager, console)
+                return None, False, thinking_mode, tools_enabled
+            else:
+                # Process as regular @ command (for manual entry or incomplete paths)
+                return _process_user_input(user_input, console, thinking_mode, tools_enabled)
+
+        # Check for other empty input
+        if not stripped_input:
             return None, False, thinking_mode, tools_enabled
 
         return _process_user_input(user_input, console, thinking_mode, tools_enabled)
@@ -109,7 +133,40 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     history_position = len(history)  # Start at end (no selection)
     original_text = ""  # Store original text when navigating
 
-    @bindings.add('enter', eager=True)
+    # Completion menu filters
+    @Condition
+    def completion_menu_inactive() -> bool:
+        try:
+            return get_app().current_buffer.complete_state is None
+        except Exception:
+            return True
+
+    @Condition
+    def completion_menu_active() -> bool:
+        return not completion_menu_inactive()
+
+    # When menu is active, Enter accepts the completion and, if a folder was chosen,
+    # immediately reopens completion in that folder.
+    @bindings.add('enter', eager=True, filter=completion_menu_active)
+    def handle_enter_accept_completion(event):
+        buf = event.current_buffer
+        state = buf.complete_state
+        if state and state.current_completion:
+            comp = state.current_completion
+            buf.apply_completion(comp)
+            # If the accepted text ends with '/', keep browsing
+            try:
+                before = buf.document.text_before_cursor
+            except Exception:
+                before = buf.text
+            if before.strip().endswith('/'):
+                buf.start_completion(select_first=True)
+                return
+            # Otherwise, this looks like a file: submit immediately so it's added to context
+            event.app.exit(result=buf.text)
+        # No further action; binding is eager so Enter won't submit.
+
+    @bindings.add('enter', eager=True, filter=completion_menu_inactive)
     def handle_enter_key_submission(event):
         """Handle Enter key press - submit the current input only if non-empty."""
         current_text = event.current_buffer.text
@@ -133,7 +190,7 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
         """Handle Escape key press - cancel input and return None."""
         event.app.exit(result=None)
 
-    @bindings.add('up', eager=True)
+    @bindings.add('up', filter=completion_menu_inactive)
     def handle_up_arrow_history(event):
         """Handle Up arrow key press - navigate to previous history item."""
         nonlocal history_position, original_text
@@ -151,7 +208,7 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
             event.current_buffer.text = history[history_position]
             event.current_buffer.cursor_position = len(history[history_position])
 
-    @bindings.add('down', eager=True)
+    @bindings.add('down', filter=completion_menu_inactive)
     def handle_down_arrow_history(event):
         """Handle Down arrow key press - navigate to next history item."""
         nonlocal history_position, original_text
@@ -257,18 +314,35 @@ def _create_prompt_functions():
     return get_main_prompt, get_continuation_prompt
 
 
-def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None) -> str:
+def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None, context_manager=None) -> str:
     """
     Execute the actual prompt-toolkit input session.
 
     Args:
         key_bindings: Pre-configured key bindings for the input session
         history: List of previous inputs for history navigation
+        context_manager: Optional context manager for @ command autocompletion
 
     Returns:
         str: Raw user input from prompt-toolkit
     """
     main_prompt, continuation_prompt = _create_prompt_functions()
+    
+    # Create @ command completer if context manager is available
+    completer = None
+    if context_manager:
+        completer = AtCommandCompleter(context_manager=context_manager)
+
+    # Simple, minimal completion menu theme to match main UI
+    minimal_style = Style.from_dict({
+        # Completion menu colors
+        "completion-menu": "bg:#2b2b2b #e5e5e5",
+        "completion-menu.completion": "bg:#2b2b2b #e5e5e5",
+        "completion-menu.completion.current": "bg:#3a3a3a #ffffff",
+        # Scrollbar
+        "scrollbar.background": "bg:#2b2b2b",
+        "scrollbar.button": "bg:#555555",
+    })
 
     return prompt(
         main_prompt,
@@ -276,6 +350,9 @@ def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None) -> s
         multiline=True,
         wrap_lines=True,
         prompt_continuation=continuation_prompt,
+        completer=completer,
+        complete_while_typing=True,  # Enable live completion
+        style=minimal_style,
     )
 
 
@@ -294,6 +371,10 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
     """
     # Input is guaranteed to be non-empty by caller
     cleaned_input = user_input.strip()
+
+    # Handle @ commands for file browsing - these need special processing
+    if cleaned_input.startswith('@'):
+        return f"__AT_COMMAND__{cleaned_input}", False, thinking_mode, tools_enabled  # Special @ command signal
 
     # Handle thinking mode toggle command
     if cleaned_input == '/think':
@@ -331,6 +412,78 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
         return cleaned_input, thinking_mode, thinking_mode, tools_enabled
     else:
         return None, False, thinking_mode, tools_enabled
+
+
+def _is_complete_at_command(at_command: str, context_manager) -> bool:
+    """Check if @ command refers to a complete file path that should be added to context.
+    
+    Args:
+        at_command: The @ command string (e.g., "@file.txt")
+        context_manager: Context manager instance
+        
+    Returns:
+        True if this is a complete file that should be auto-added to context
+    """
+    if not at_command.startswith('@'):
+        return False
+    
+    file_path = at_command[1:]  # Remove @ prefix
+    
+    # Don't auto-add if it's just "@" or ends with "/"
+    if not file_path or file_path.endswith('/'):
+        return False
+    
+    # Check if it's a valid file path
+    import os
+    try:
+        # Resolve path
+        if file_path.startswith('~/'):
+            resolved_path = os.path.expanduser(file_path)
+        elif file_path.startswith('./'):
+            resolved_path = os.path.abspath(file_path)
+        elif os.path.isabs(file_path):
+            resolved_path = file_path
+        else:
+            resolved_path = os.path.join(os.getcwd(), file_path)
+        
+        # Check if it's a readable file
+        return os.path.isfile(resolved_path) and os.access(resolved_path, os.R_OK)
+    except:
+        return False
+
+
+def _handle_at_selection(at_command: str, context_manager, console: Console) -> None:
+    """Handle automatic addition of file to context from @ autocomplete selection.
+    
+    Args:
+        at_command: The @ command string (e.g., "@file.txt")
+        context_manager: Context manager instance
+        console: Rich console for output
+    """
+    if not context_manager:
+        return
+    
+    file_path = at_command[1:]  # Remove @ prefix
+    
+    try:
+        # Add file to context
+        context_manager.add_file_context(file_path)
+        
+        # Get relative path for display
+        import os
+        try:
+            rel_path = os.path.relpath(file_path)
+            display_path = rel_path if len(rel_path) < len(file_path) else file_path
+        except ValueError:
+            display_path = file_path
+        
+        console.print(f"[green]Added context file: {display_path}[/green]")
+        console.print(f"[dim]Context status: {context_manager.get_status_summary()}[/dim]")
+        
+    except ValueError as e:
+        console.print(f"[red]Error adding context: {e}[/red]")
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {e}[/red]")
 
 
 def _display_cancellation_message(console: Console) -> None:

@@ -8,18 +8,22 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"tool_start"|"to
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, **_: dict
 ) -> dict:
     """Construct Bedrock/Anthropic-style chat payload.
 
     Notes:
     - Do not include a 'model' key by default; many Bedrock endpoints select model via path/config.
     - Keep structure aligned with existing behavior for backward compatibility.
+    - If context_content is provided, it will be prepended to the first user message.
     """
+    # Process messages to inject context if provided
+    processed_messages = _inject_context_into_messages(messages, context_content) if context_content else messages
+    
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
-        "messages": messages,
+        "messages": processed_messages,
     }
 
     if thinking:
@@ -32,6 +36,42 @@ def build_payload(
         payload["tools"] = tools
 
     return payload
+
+
+def _inject_context_into_messages(messages: List[dict], context_content: str) -> List[dict]:
+    """Inject context content into the first user message.
+    
+    Args:
+        messages: Original conversation messages
+        context_content: Formatted context content to inject
+        
+    Returns:
+        New message list with context injected
+    """
+    if not messages or not context_content.strip():
+        return messages
+    
+    # Create a copy of messages to avoid modifying the original
+    processed_messages = []
+    
+    # Find the first user message and inject context
+    context_injected = False
+    for message in messages:
+        if message.get("role") == "user" and not context_injected:
+            # Inject context before the first user message content
+            original_content = message.get("content", "")
+            new_content = f"{context_content}\n\n{original_content}" if original_content else context_content
+            
+            processed_messages.append({
+                **message,
+                "content": new_content
+            })
+            context_injected = True
+        else:
+            # Copy message as-is
+            processed_messages.append(message)
+    
+    return processed_messages
 
 
 def map_events(lines: Iterator[str]) -> Iterator[Event]:
