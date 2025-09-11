@@ -5,7 +5,11 @@ def test_azure_build_payload_basic():
     messages = [{"role": "user", "content": "Hello"}]
     body = build_payload(messages, model="gpt-4o", max_tokens=128, temperature=0.2)
     assert body["model"] == "gpt-4o"
-    assert body["messages"] == messages
+    # Should have system message prepended automatically
+    assert len(body["messages"]) == 2
+    assert body["messages"][0]["role"] == "system"
+    assert body["messages"][0]["content"] == "Use Markdown formatting when appropriate."
+    assert body["messages"][1] == {"role": "user", "content": "Hello"}
     assert body["stream"] is True
     assert body["max_completion_tokens"] == 128
     assert body["temperature"] == 0.2
@@ -29,8 +33,25 @@ def test_azure_build_payload_without_model_omits_model_key():
     messages = [{"role": "user", "content": "Hello"}]
     body = build_payload(messages, model=None, max_tokens=None)
     assert "model" not in body
-    assert body["messages"] == messages
+    # Should have system message prepended automatically
+    assert len(body["messages"]) == 2
+    assert body["messages"][0]["role"] == "system"
+    assert body["messages"][1] == {"role": "user", "content": "Hello"}
     assert body["stream"] is True
+
+
+def test_azure_build_payload_preserves_existing_system_message():
+    """Test that existing system messages are not overridden."""
+    messages = [
+        {"role": "system", "content": "Custom system prompt"},
+        {"role": "user", "content": "Hello"}
+    ]
+    body = build_payload(messages, model="gpt-4o")
+    # Should preserve existing system message
+    assert len(body["messages"]) == 2
+    assert body["messages"][0]["role"] == "system"
+    assert body["messages"][0]["content"] == "Custom system prompt"
+    assert body["messages"][1] == {"role": "user", "content": "Hello"}
 
 
 def test_azure_map_events_azure_like_stream():

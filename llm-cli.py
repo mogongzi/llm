@@ -23,7 +23,7 @@ import os
 import signal
 import sys
 from typing import List, Optional, Tuple
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, ReadTimeout, ConnectTimeout
 from rich.console import Console
 from rich.text import Text
 from util.sse_client import iter_sse_lines
@@ -67,6 +67,8 @@ def stream_and_render(
     mock_file: Optional[str] = None,
     show_rule: bool = True,
     tool_executor: Optional[ToolExecutor] = None,
+    use_thinking: bool = False,
+    provider_name: str = "bedrock",
 ) -> Tuple[str, int, float, List[dict]]:
     """Stream SSE and render incrementally with live Markdown rendering.
 
@@ -97,118 +99,128 @@ def stream_and_render(
             params["delay_ms"] = mock_delay
         method = "GET" if use_mock else "POST"
         # Enable raw terminal mode for ESC detection
-        with _raw_mode(sys.stdin):
-            # Show waiting indicator until first content arrives
-            ms.start_waiting("Waiting for response…")
-            # Stream SSE events and map to structured data
-            for kind, value in mapper(
-                iter_sse_lines(
-                    url,
-                    method=method,
-                    json=(None if use_mock else payload),
-                    params=(params or None),
-                    timeout=timeout,
-                )
-            ):
-                # Check for abort conditions (ESC key or signal)
-                if _ABORT or _esc_pressed(0.0):
-                    _ABORT = True
-                    break
-                if kind == "model":
-                    # Model name received - stop waiting and show header
-                    ms.stop_waiting()
-                    model_name = value or model_name
-                    if show_rule and model_name:
-                        console.rule(f"[bold {COLOR_MODEL}]{model_name}")
-                elif kind == "thinking":
-                    # Thinking content received - render in special thinking mode
-                    ms.stop_waiting()
-                    ms.add_thinking(value or "")
-                elif kind == "text":
-                    # Regular response text - accumulate and render
-                    ms.stop_waiting()
-                    buf.append(value or "")
-                    ms.add_response(value or "")
-                elif kind == "tool_start":
-                    # Tool call initiated - parse and store tool metadata
-                    ms.stop_waiting()
-                    if tool_executor and value:
-                        import json
-                        try:
-                            # Parse tool info (name, id) and reset input buffer
-                            current_tool = json.loads(value)
-                            tool_input_buffer = ""
-                            console.print(f"[yellow]⚙ Using {current_tool.get('name')} tool...[/yellow]")
-                        except json.JSONDecodeError:
-                            console.print(f"[red]Error: Invalid tool start format[/red]")
-                elif kind == "tool_input_delta":
-                    # Streaming tool parameters - accumulate JSON input
-                    if value:
-                        tool_input_buffer += value
-                elif kind == "tool_ready":
-                    # Tool input complete - execute and capture result
-                    if tool_executor and current_tool:
-                        import json
-                        try:
-                            # Parse complete tool parameters (fallback to empty dict)
-                            tool_input = json.loads(tool_input_buffer) if tool_input_buffer else {}
-                            tool_name = current_tool.get("name")
-                            tool_id = current_tool.get("id")
+        try:
+            with _raw_mode(sys.stdin):
+                # Show waiting indicator until first content arrives
+                if use_thinking and provider_name == "azure":
+                    ms.start_waiting("Thinking…")
+                else:
+                    ms.start_waiting("Waiting for response…")
+                # Stream SSE events and map to structured data
+                for kind, value in mapper(
+                    iter_sse_lines(
+                        url,
+                        method=method,
+                        json=(None if use_mock else payload),
+                        params=(params or None),
+                        timeout=timeout,
+                    )
+                ):
+                    # Check for abort conditions (ESC key or signal)
+                    if _ABORT or _esc_pressed(0.0):
+                        _ABORT = True
+                        break
+                    if kind == "model":
+                        # Model name received - stop waiting and show header
+                        ms.stop_waiting()
+                        model_name = value or model_name
+                        if show_rule and model_name:
+                            console.rule(f"[bold {COLOR_MODEL}]{model_name}")
+                    elif kind == "thinking":
+                        # Thinking content received - render in special thinking mode
+                        ms.stop_waiting()
+                        ms.add_thinking(value or "")
+                    elif kind == "text":
+                        # Regular response text - accumulate and render
+                        ms.stop_waiting()
+                        buf.append(value or "")
+                        ms.add_response(value or "")
+                    elif kind == "tool_start":
+                        # Tool call initiated - parse and store tool metadata
+                        ms.stop_waiting()
+                        if tool_executor and value:
+                            import json
+                            try:
+                                # Parse tool info (name, id) and reset input buffer
+                                current_tool = json.loads(value)
+                                tool_input_buffer = ""
+                                console.print(f"[yellow]⚙ Using {current_tool.get('name')} tool...[/yellow]")
+                            except json.JSONDecodeError:
+                                console.print(f"[red]Error: Invalid tool start format[/red]")
+                    elif kind == "tool_input_delta":
+                        # Streaming tool parameters - accumulate JSON input
+                        if value:
+                            tool_input_buffer += value
+                    elif kind == "tool_ready":
+                        # Tool input complete - execute and capture result
+                        if tool_executor and current_tool:
+                            import json
+                            try:
+                                # Parse complete tool parameters (fallback to empty dict)
+                                tool_input = json.loads(tool_input_buffer) if tool_input_buffer else {}
+                                tool_name = current_tool.get("name")
+                                tool_id = current_tool.get("id")
 
-                            # Execute the tool with parsed parameters
-                            result = tool_executor.execute_tool(tool_name, tool_input)
+                                # Execute the tool with parsed parameters
+                                result = tool_executor.execute_tool(tool_name, tool_input)
 
-                            # Display tool result and capture for conversation
-                            if "error" in result:
-                                console.print(f"[red]Tool error: {result['error']}[/red]")
-                                tool_result_content = result['content']
-                            else:
-                                console.print(f"[green]✓ {result['content']}[/green]")
-                                tool_result_content = result['content']
+                                # Display tool result and capture for conversation
+                                if "error" in result:
+                                    console.print(f"[red]Tool error: {result['error']}[/red]")
+                                    tool_result_content = result['content']
+                                else:
+                                    console.print(f"[green]✓ {result['content']}[/green]")
+                                    tool_result_content = result['content']
 
-                            # Store complete tool call data for follow-up request
-                            tool_calls_made.append({
-                                "tool_call": {
-                                    "id": tool_id,
-                                    "name": tool_name,
-                                    "input": tool_input
-                                },
-                                "result": tool_result_content
-                            })
+                                # Store complete tool call data for follow-up request
+                                tool_calls_made.append({
+                                    "tool_call": {
+                                        "id": tool_id,
+                                        "name": tool_name,
+                                        "input": tool_input
+                                    },
+                                    "result": tool_result_content
+                                })
 
-                        except json.JSONDecodeError:
-                            console.print(f"[red]Error: Invalid tool input JSON: {tool_input_buffer}[/red]")
-                        finally:
-                            # Reset state for next potential tool call
-                            current_tool = None
-                            tool_input_buffer = ""
-                elif kind == "tokens":
-                    # Parse usage statistics: "tokens|input_tokens|output_tokens|cost"
-                    if value and "|" in value:
-                        parts = value.split("|")
-                        if len(parts) >= 4:
-                            total_tokens = int(parts[0]) if parts[0].isdigit() else 0
-                            cost = float(parts[3]) if parts[3] else 0.0
-                            return "".join(buf), total_tokens, cost, tool_calls_made
-                    # Fallback for legacy simple token format
-                    tokens = int(value) if value and value.isdigit() else 0
-                    return "".join(buf), tokens, 0.0, tool_calls_made
-                elif kind == "done":
-                    # Stream completed successfully
-                    break
-    except RequestException as e:
-        console.print(f"[red]Network error[/red]: {e}")
-        # Extract additional error details from HTTP response
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                error_text = e.response.text
-                console.print(f"[red]Response body[/red]: {error_text}")
-            except:
-                console.print(f"[red]Status code[/red]: {e.response.status_code}")
-    except Exception as e:
-        console.print(f"[red]Unexpected error[/red]: {e}")
-        import traceback
-        console.print(f"[red]Details[/red]: {traceback.format_exc()}")
+                            except json.JSONDecodeError:
+                                console.print(f"[red]Error: Invalid tool input JSON: {tool_input_buffer}[/red]")
+                            finally:
+                                # Reset state for next potential tool call
+                                current_tool = None
+                                tool_input_buffer = ""
+                    elif kind == "tokens":
+                        # Parse usage statistics: "tokens|input_tokens|output_tokens|cost"
+                        if value and "|" in value:
+                            parts = value.split("|")
+                            if len(parts) >= 4:
+                                total_tokens = int(parts[0]) if parts[0].isdigit() else 0
+                                cost = float(parts[3]) if parts[3] else 0.0
+                                return "".join(buf), total_tokens, cost, tool_calls_made
+                        # Fallback for legacy simple token format
+                        tokens = int(value) if value and value.isdigit() else 0
+                        return "".join(buf), tokens, 0.0, tool_calls_made
+                    elif kind == "done":
+                        # Stream completed successfully
+                        break
+        except (ReadTimeout, ConnectTimeout) as e:
+            ms.stop_waiting()
+            console.print(f"[red]Request timed out[/red]: {e}")
+            console.print(f"[dim]Try increasing timeout with --timeout parameter[/dim]")
+        except RequestException as e:
+            ms.stop_waiting()
+            console.print(f"[red]Network error[/red]: {e}")
+            # Extract additional error details from HTTP response
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_text = e.response.text
+                    console.print(f"[red]Response body[/red]: {error_text}")
+                except:
+                    console.print(f"[red]Status code[/red]: {e.response.status_code}")
+        except Exception as e:
+            ms.stop_waiting()
+            console.print(f"[red]Unexpected error[/red]: {e}")
+            import traceback
+            console.print(f"[red]Details[/red]: {traceback.format_exc()}")
     finally:
         # Finalize markdown rendering with accumulated content
         ms.update("".join(buf), final=True)
@@ -308,6 +320,9 @@ def repl(
     tool_executor = ToolExecutor()
     context_manager = ContextManager()
     path_browser = PathBrowser()
+    # Extract provider name from module name (e.g., "providers.azure" -> "azure")
+    provider_name = provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock"
+    
     session = ChatSession(
         url=url,
         provider=provider,
@@ -319,7 +334,8 @@ def repl(
         mock_file=mock_file,
         show_rule=show_rule,
         tool_executor=tool_executor,
-        context_manager=context_manager
+        context_manager=context_manager,
+        provider_name=provider_name
     )
 
     # Track UI state that persists across interactions

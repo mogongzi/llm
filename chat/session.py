@@ -15,9 +15,10 @@ class ChatSession:
     
     def __init__(self, url: str, provider, model: Optional[str], max_tokens: int, 
                  live_window: int, use_mock: bool, timeout: float, mock_file: Optional[str],
-                 show_rule: bool, tool_executor, context_manager=None):
+                 show_rule: bool, tool_executor, context_manager=None, provider_name: str = "bedrock"):
         self.url = url
         self.provider = provider
+        self.provider_name = provider_name
         self.model = model
         self.max_tokens = max_tokens
         self.live_window = live_window
@@ -48,6 +49,8 @@ class ChatSession:
             mock_file=self.mock_file,
             show_rule=self.show_rule,
             tool_executor=self.tool_executor,
+            use_thinking=use_thinking,
+            provider_name=self.provider_name,
         )
         
         return reply_text, tokens_used, cost_used, tool_calls_made
@@ -73,6 +76,8 @@ class ChatSession:
             mock_file=self.mock_file,
             show_rule=False,  # Skip model header for follow-up
             tool_executor=self.tool_executor,
+            use_thinking=use_thinking,
+            provider_name=self.provider_name,
         )
         
         return followup_reply, followup_tokens, followup_cost
