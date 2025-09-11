@@ -19,7 +19,7 @@ def build_payload(
     """
     # Process messages to inject context if provided
     processed_messages = _inject_context_into_messages(messages, context_content) if context_content else messages
-    
+
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
@@ -31,7 +31,7 @@ def build_payload(
             "type": "enabled",
             "budget_tokens": thinking_tokens
         }
-    
+
     if tools:
         payload["tools"] = tools
 
@@ -40,20 +40,20 @@ def build_payload(
 
 def _inject_context_into_messages(messages: List[dict], context_content: str) -> List[dict]:
     """Inject context content into the first user message.
-    
+
     Args:
         messages: Original conversation messages
         context_content: Formatted context content to inject
-        
+
     Returns:
         New message list with context injected
     """
     if not messages or not context_content.strip():
         return messages
-    
+
     # Create a copy of messages to avoid modifying the original
     processed_messages = []
-    
+
     # Find the first user message and inject context
     context_injected = False
     for message in messages:
@@ -61,7 +61,7 @@ def _inject_context_into_messages(messages: List[dict], context_content: str) ->
             # Inject context before the first user message content
             original_content = message.get("content", "")
             new_content = f"{context_content}\n\n{original_content}" if original_content else context_content
-            
+
             processed_messages.append({
                 **message,
                 "content": new_content
@@ -70,7 +70,7 @@ def _inject_context_into_messages(messages: List[dict], context_content: str) ->
         else:
             # Copy message as-is
             processed_messages.append(message)
-    
+
     return processed_messages
 
 

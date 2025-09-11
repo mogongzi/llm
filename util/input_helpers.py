@@ -19,6 +19,7 @@ def _raw_mode(file):
         yield
         return
 
+    old_attrs = None
     try:
         # Skip raw mode for non-TTY files (pipes, redirects)
         if not hasattr(file, "isatty") or not file.isatty():
@@ -27,16 +28,19 @@ def _raw_mode(file):
         fd = file.fileno()
         # Save current terminal attributes for restoration
         old_attrs = termios.tcgetattr(fd)
-        try:
-            # Enable character-break mode (single char input without buffering)
-            tty.setcbreak(fd)
-            yield
-        finally:
-            # Always restore original terminal settings
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
-    except Exception:
-        # Fallback if anything goes wrong
+        # Enable character-break mode (single char input without buffering)
+        tty.setcbreak(fd)
         yield
+    except Exception:
+        # Let the exception bubble up after restoring terminal
+        raise
+    finally:
+        # Always restore original terminal settings if they were saved
+        if old_attrs is not None:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+            except Exception:
+                pass  # Ignore restore errors
 
 
 def _esc_pressed(timeout: float = 0.0) -> bool:
