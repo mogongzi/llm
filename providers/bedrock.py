@@ -8,7 +8,7 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"tool_start"|"to
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, system_prompt: Optional[str] = None, **_: dict
 ) -> dict:
     """Construct Bedrock/Anthropic-style chat payload.
 
@@ -25,6 +25,10 @@ def build_payload(
         "max_tokens": max_tokens,
         "messages": processed_messages,
     }
+
+    # Anthropic-style API supports top-level 'system' for instructions
+    if system_prompt:
+        payload["system"] = system_prompt
 
     if thinking:
         payload["thinking"] = {

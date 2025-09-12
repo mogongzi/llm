@@ -6,3 +6,5 @@ logs/
 .DS_Store
 __pycache__/
 *.py[cod]
+.rag_index.json
+docs/
