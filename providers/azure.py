@@ -103,7 +103,7 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: Optional[int] = None, temperature: Optional[float] = None, thinking: bool = False, tools: Optional[List[dict]] = None, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: Optional[int] = None, temperature: Optional[float] = None, thinking: bool = False, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, **_: dict
 ) -> dict:
     """Construct an Azure/OpenAI Chat Completions streaming payload.
 
@@ -128,6 +128,31 @@ def build_payload(
     if not openai_messages or openai_messages[0].get("role") != "system":
         system_message = {"role": "system", "content": "Use Markdown formatting when appropriate."}
         final_messages.insert(0, system_message)
+
+    # Optionally inject context by prepending to the first user message content
+    if context_content and context_content.strip():
+        inserted = False
+        for msg in final_messages:
+            if msg.get("role") == "user":
+                old = msg.get("content")
+                if isinstance(old, str) and old:
+                    msg["content"] = f"{context_content}\n\n{old}"
+                elif old is None:
+                    msg["content"] = context_content
+                elif isinstance(old, str) and not old:
+                    msg["content"] = context_content
+                else:
+                    # Fallback: insert a new user message before this
+                    idx = final_messages.index(msg)
+                    final_messages.insert(idx, {"role": "user", "content": context_content})
+                inserted = True
+                break
+        if not inserted:
+            # No user message found; place after system message if present, else as first
+            if final_messages and final_messages[0].get("role") == "system":
+                final_messages.insert(1, {"role": "user", "content": context_content})
+            else:
+                final_messages.insert(0, {"role": "user", "content": context_content})
 
     body: Dict = {
         "messages": final_messages,

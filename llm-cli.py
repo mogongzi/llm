@@ -43,6 +43,7 @@ from chat.session import ChatSession
 from chat.tool_workflow import process_tool_execution
 from context.context_manager import ContextManager
 from util.path_browser import PathBrowser
+from rag.manager import RAGManager
 
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
@@ -319,6 +320,7 @@ def repl(
     usage = UsageTracker(max_tokens_limit=200000)
     tool_executor = ToolExecutor()
     context_manager = ContextManager()
+    rag_manager = RAGManager()
     path_browser = PathBrowser()
     # Extract provider name from module name (e.g., "providers.azure" -> "azure")
     provider_name = provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock"
@@ -335,6 +337,7 @@ def repl(
         show_rule=show_rule,
         tool_executor=tool_executor,
         context_manager=context_manager,
+        rag_manager=rag_manager,
         provider_name=provider_name
     )
 
@@ -358,7 +361,7 @@ def repl(
                 return 0
 
             # Handle special commands
-            if handle_special_commands(user_input, conversation, console, context_manager, path_browser):
+            if handle_special_commands(user_input, conversation, console, context_manager, path_browser, rag_manager):
                 continue
 
         except (EOFError, KeyboardInterrupt):
