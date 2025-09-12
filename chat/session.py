@@ -15,7 +15,7 @@ class ChatSession:
     
     def __init__(self, url: str, provider, model: Optional[str], max_tokens: int, 
                  live_window: int, use_mock: bool, timeout: float, mock_file: Optional[str],
-                 show_rule: bool, tool_executor, context_manager=None, provider_name: str = "bedrock"):
+                 show_rule: bool, tool_executor, context_manager=None, rag_manager=None, provider_name: str = "bedrock"):
         self.url = url
         self.provider = provider
         self.provider_name = provider_name
@@ -28,13 +28,36 @@ class ChatSession:
         self.show_rule = show_rule
         self.tool_executor = tool_executor
         self.context_manager = context_manager
+        self.rag_manager = rag_manager
     
     def send_message(self, history: List[dict], use_thinking: bool, tools_enabled: bool, 
                     available_tools, stream_and_render_func) -> Tuple[str, int, float, List[dict]]:
         """Send a message and handle the complete request/response cycle including tools."""
         # Build request payload with conditional tool support and context injection
         tools_param = available_tools if tools_enabled else None
-        context_content = self.context_manager.format_context_for_llm() if self.context_manager else None
+        base_context = self.context_manager.format_context_for_llm() if self.context_manager else None
+
+        # Compose RAG context if enabled
+        rag_block = None
+        if self.rag_manager and getattr(self.rag_manager, "enabled", False):
+            # Use last user message content as query
+            query = ""
+            for msg in reversed(history):
+                if msg.get("role") == "user" and isinstance(msg.get("content"), str):
+                    query = msg["content"]
+                    break
+            if query.strip():
+                try:
+                    rag_block = self.rag_manager.search_and_format(query, k=self.rag_manager.default_k)
+                except Exception:
+                    rag_block = None
+        # Merge context blocks
+        context_parts = []
+        if base_context:
+            context_parts.append(base_context)
+        if rag_block:
+            context_parts.append(rag_block)
+        context_content = "\n\n".join(context_parts) if context_parts else None
         payload = self.provider.build_payload(history, model=self.model, max_tokens=self.max_tokens, 
                                              thinking=use_thinking, tools=tools_param, context_content=context_content)
         
