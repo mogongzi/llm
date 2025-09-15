@@ -139,9 +139,9 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                 output_tokens = usage.get("outputTokenCount", 0) or usage.get("output_tokens", 0)
                 total_tokens = input_tokens + output_tokens
                 if total_tokens > 0:
-                    # Calculate cost (Claude 3.5 Sonnet pricing: $3/1M input, $15/1M output)
-                    input_cost = (input_tokens / 1000000) * 3.0
-                    output_cost = (output_tokens / 1000000) * 15.0
+                    # Calculate cost (Claude 4 Sonnet pricing: $2.04/1K input, $9.88/1K output)
+                    input_cost = (input_tokens / 1000) * 0.00204
+                    output_cost = (output_tokens / 1000) * 0.00988
                     total_cost = input_cost + output_cost
 
                     # Format: "tokens|input_tokens|output_tokens|cost"

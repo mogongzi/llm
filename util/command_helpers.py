@@ -57,12 +57,12 @@ def handle_special_commands(user_input: Optional[str], conversation, console=Non
         if console:
             show_help_message(console)
         return True
-    
+
     # Handle @ commands for file browsing
     if user_input and user_input.startswith("__AT_COMMAND__"):
         at_command = user_input[14:]  # Remove "__AT_COMMAND__" prefix
         return handle_at_command(at_command, context_manager, path_browser, console)
-    
+
     # Handle context commands
     if user_input and user_input.strip().lower().startswith("/context"):
         return handle_context_command(user_input.strip(), context_manager, console)
@@ -70,7 +70,7 @@ def handle_special_commands(user_input: Optional[str], conversation, console=Non
     # Handle RAG commands
     if user_input and user_input.strip().lower().startswith("/rag"):
         return handle_rag_command(user_input.strip(), rag_manager, console)
-    
+
     if user_input is None:
         return True  # Command handled or empty input
     return False
@@ -78,12 +78,12 @@ def handle_special_commands(user_input: Optional[str], conversation, console=Non
 
 def handle_context_command(user_input: str, context_manager: Optional[ContextManager], console) -> bool:
     """Handle /context commands for file context management.
-    
+
     Args:
         user_input: The full command input
         context_manager: Context manager instance
         console: Rich console for output
-        
+
     Returns:
         True if command was handled
     """
@@ -91,10 +91,10 @@ def handle_context_command(user_input: str, context_manager: Optional[ContextMan
         if console:
             console.print("[red]Context manager not available[/red]")
         return True
-    
+
     # Parse command parts
     parts = user_input.split(None, 2)  # Split into max 3 parts: /context, subcommand, argument
-    
+
     if len(parts) == 1:
         # Just "/context" - show status
         contexts = context_manager.list_contexts()
@@ -105,15 +105,15 @@ def handle_context_command(user_input: str, context_manager: Optional[ContextMan
             for ctx in contexts:
                 console.print(f"  [cyan]{ctx['path']}[/cyan] ({ctx['size']}, added {ctx['timestamp']})")
         return True
-    
+
     subcommand = parts[1].lower()
-    
+
     if subcommand == "clear":
         # Clear all context
         context_manager.clear_all_context()
         console.print("[green]All context files cleared[/green]")
         return True
-    
+
     elif subcommand == "list":
         # List active contexts
         contexts = context_manager.list_contexts()
@@ -124,11 +124,11 @@ def handle_context_command(user_input: str, context_manager: Optional[ContextMan
             for ctx in contexts:
                 console.print(f"  [cyan]{ctx['path']}[/cyan] ({ctx['size']}, added {ctx['timestamp']})")
         return True
-    
+
     else:
         # Treat as file path (including cases where subcommand is actually a file path)
         file_path = " ".join(parts[1:])  # Rejoin everything after "/context"
-        
+
         try:
             context_manager.add_file_context(file_path)
             console.print(f"[green]Added context file: {file_path}[/green]")
@@ -139,19 +139,19 @@ def handle_context_command(user_input: str, context_manager: Optional[ContextMan
             console.print(f"[red]Error adding context: {e}[/red]")
         except Exception as e:
             console.print(f"[red]Unexpected error: {e}[/red]")
-        
+
         return True
 
 
 def handle_at_command(at_command: str, context_manager: Optional[ContextManager], path_browser: Optional[PathBrowser], console) -> bool:
     """Handle @ commands for file browsing and context addition.
-    
+
     Args:
         at_command: The @ command (e.g., "@", "@/path/", "@file.txt")
         context_manager: Context manager instance
         path_browser: Path browser instance
         console: Rich console for output
-        
+
     Returns:
         True if command was handled
     """
@@ -159,11 +159,11 @@ def handle_at_command(at_command: str, context_manager: Optional[ContextManager]
         if console:
             console.print("[red]Path browser not available[/red]")
         return True
-    
+
     try:
         # Parse the @ command
         path, is_directory_listing = path_browser.parse_at_command(at_command)
-        
+
         if is_directory_listing:
             # Suppress printing listings; rely on @ dropdown navigation
             # No output here keeps the input session active and uncluttered.
@@ -173,13 +173,13 @@ def handle_at_command(at_command: str, context_manager: Optional[ContextManager]
             if not context_manager:
                 console.print("[red]Context manager not available[/red]")
                 return True
-            
+
             # Validate file first
             is_valid, error_msg = path_browser.validate_file_for_context(path)
             if not is_valid:
                 console.print(f"[red]{error_msg}[/red]")
                 return True
-            
+
             # Try to add to context
             try:
                 context_manager.add_file_context(path)
@@ -190,10 +190,10 @@ def handle_at_command(at_command: str, context_manager: Optional[ContextManager]
                 console.print(f"[red]Error adding context: {e}[/red]")
             except Exception as e:
                 console.print(f"[red]Unexpected error: {e}[/red]")
-    
+
     except Exception as e:
         console.print(f"[red]Error processing @ command: {e}[/red]")
-    
+
     return True
 
 

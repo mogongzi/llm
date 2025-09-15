@@ -260,14 +260,180 @@ def test_update_with_only_tokens():
 def test_update_with_only_cost():
     """Test updating with only cost (zero tokens)."""
     tracker = UsageTracker()
-    
+
     tracker.update(0, 0.025)
-    
+
     assert tracker.total_tokens_used == 0
     assert tracker.total_cost == 0.025
-    
+
     # Should return None since no tokens used
     assert tracker.get_display_string() is None
+
+
+def test_gpt5_pricing_calculations():
+    """Test cost calculations using GPT-5 pricing."""
+    tracker = UsageTracker()
+
+    # GPT-5 pricing: $0.00091/1K input, $0.00677/1K output
+    # Test case: 10 input tokens, 549 output tokens (from example)
+    input_tokens = 10
+    output_tokens = 549
+    total_tokens = input_tokens + output_tokens
+
+    expected_input_cost = (input_tokens / 1000) * 0.00091
+    expected_output_cost = (output_tokens / 1000) * 0.00677
+    expected_total_cost = expected_input_cost + expected_output_cost
+
+    tracker.update(total_tokens, expected_total_cost)
+
+    assert tracker.total_tokens_used == 559
+    assert abs(tracker.total_cost - expected_total_cost) < 0.0001
+
+    display = tracker.get_display_string()
+    assert "559/200000" in display
+    # Should use 4-digit precision for costs in the $0.001-$0.01 range
+    assert "$0.0037" in display
+
+
+def test_claude4_pricing_calculations():
+    """Test cost calculations using Claude 4 Sonnet pricing."""
+    tracker = UsageTracker()
+
+    # Claude 4 Sonnet pricing: $0.00204/1K input, $0.00988/1K output
+    # Test case: 15 input tokens, 25 output tokens
+    input_tokens = 15
+    output_tokens = 25
+    total_tokens = input_tokens + output_tokens
+
+    expected_input_cost = (input_tokens / 1000) * 0.00204
+    expected_output_cost = (output_tokens / 1000) * 0.00988
+    expected_total_cost = expected_input_cost + expected_output_cost
+
+    tracker.update(total_tokens, expected_total_cost)
+
+    assert tracker.total_tokens_used == 40
+    assert abs(tracker.total_cost - expected_total_cost) < 0.0001
+
+    display = tracker.get_display_string()
+    assert "40/200000" in display
+
+
+def test_provider_pricing_comparison():
+    """Test cost difference between providers for same token usage."""
+    gpt5_tracker = UsageTracker()
+    claude4_tracker = UsageTracker()
+
+    # Same usage: 1000 input, 2000 output tokens
+    input_tokens = 1000
+    output_tokens = 2000
+    total_tokens = input_tokens + output_tokens
+
+    # GPT-5 cost calculation
+    gpt5_input_cost = (input_tokens / 1000) * 0.00091
+    gpt5_output_cost = (output_tokens / 1000) * 0.00677
+    gpt5_total_cost = gpt5_input_cost + gpt5_output_cost
+
+    # Claude 4 cost calculation
+    claude4_input_cost = (input_tokens / 1000) * 0.00204
+    claude4_output_cost = (output_tokens / 1000) * 0.00988
+    claude4_total_cost = claude4_input_cost + claude4_output_cost
+
+    gpt5_tracker.update(total_tokens, gpt5_total_cost)
+    claude4_tracker.update(total_tokens, claude4_total_cost)
+
+    # Both should have same token count
+    assert gpt5_tracker.total_tokens_used == claude4_tracker.total_tokens_used == 3000
+
+    # But different costs (Claude 4 should be more expensive)
+    assert claude4_tracker.total_cost > gpt5_tracker.total_cost
+
+    # Verify specific costs
+    expected_gpt5_cost = 0.00091 + 0.01354  # $0.014450
+    expected_claude4_cost = 0.00204 + 0.01976  # $0.021800
+
+    assert abs(gpt5_tracker.total_cost - expected_gpt5_cost) < 0.0001
+    assert abs(claude4_tracker.total_cost - expected_claude4_cost) < 0.0001
+
+
+def test_high_volume_usage_tracking():
+    """Test usage tracking with high token volumes and costs."""
+    tracker = UsageTracker(max_tokens_limit=1000000)  # 1M limit
+
+    # Simulate multiple large conversations
+    conversations = [
+        (50000, 0.25),    # Large document analysis
+        (75000, 0.38),    # Code review session
+        (30000, 0.15),    # Q&A session
+        (120000, 0.60),   # Long reasoning task
+        (25000, 0.12),    # Summary generation
+    ]
+
+    total_expected_tokens = sum(tokens for tokens, _ in conversations)
+    total_expected_cost = sum(cost for _, cost in conversations)
+
+    for tokens, cost in conversations:
+        tracker.update(tokens, cost)
+
+    assert tracker.total_tokens_used == total_expected_tokens  # 300,000
+    assert abs(tracker.total_cost - total_expected_cost) < 0.0001  # $1.50
+
+    display = tracker.get_display_string()
+    assert "300.0k/1000k" in display
+    assert "(30.0%)" in display
+    assert "$1.500" in display  # Should use 3-digit precision
+
+
+def test_cost_accumulation_precision():
+    """Test that repeated small cost additions maintain precision."""
+    tracker = UsageTracker()
+
+    # Add many small costs that could cause floating point drift
+    small_cost = 0.000123
+    small_tokens = 100
+    iterations = 1000
+
+    for _ in range(iterations):
+        tracker.update(small_tokens, small_cost)
+
+    expected_total_tokens = small_tokens * iterations  # 100,000
+    expected_total_cost = small_cost * iterations      # 0.123
+
+    assert tracker.total_tokens_used == expected_total_tokens
+    # Allow for small floating point precision differences
+    assert abs(tracker.total_cost - expected_total_cost) < 0.0001
+
+    display = tracker.get_display_string()
+    assert "100.0k/200k" in display
+    assert "(50.0%)" in display
+
+
+def test_token_parsing_format_validation():
+    """Test that the tracker works with the token format from providers."""
+    tracker = UsageTracker()
+
+    # Simulate parsing token info from provider: "total|input|output|cost"
+    token_info_azure = "559|10|549|0.003726"  # GPT-5 example
+    token_info_bedrock = "40|15|25|0.000277"   # Claude 4 example
+
+    # Parse Azure format
+    parts = token_info_azure.split("|")
+    azure_tokens = int(parts[0])
+    azure_cost = float(parts[3])
+    tracker.update(azure_tokens, azure_cost)
+
+    # Parse Bedrock format
+    parts = token_info_bedrock.split("|")
+    bedrock_tokens = int(parts[0])
+    bedrock_cost = float(parts[3])
+    tracker.update(bedrock_tokens, bedrock_cost)
+
+    # Verify totals
+    assert tracker.total_tokens_used == 599  # 559 + 40
+    expected_total_cost = 0.003726 + 0.000277
+    assert abs(tracker.total_cost - expected_total_cost) < 0.0001
+
+    display = tracker.get_display_string()
+    assert "599/200000" in display
 
 
 if __name__ == "__main__":
@@ -293,4 +459,10 @@ if __name__ == "__main__":
         test_realistic_usage_scenario()
         test_update_with_only_tokens()
         test_update_with_only_cost()
+        test_gpt5_pricing_calculations()
+        test_claude4_pricing_calculations()
+        test_provider_pricing_comparison()
+        test_high_volume_usage_tracking()
+        test_cost_accumulation_precision()
+        test_token_parsing_format_validation()
         print("All usage tracker tests passed!")

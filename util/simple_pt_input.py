@@ -327,7 +327,7 @@ def _prompt_for_input(key_bindings: KeyBindings, history: list[str] = None, cont
         str: Raw user input from prompt-toolkit
     """
     main_prompt, continuation_prompt = _create_prompt_functions()
-    
+
     # Create @ command completer if context manager is available
     completer = None
     if context_manager:
@@ -416,23 +416,23 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
 
 def _is_complete_at_command(at_command: str, context_manager) -> bool:
     """Check if @ command refers to a complete file path that should be added to context.
-    
+
     Args:
         at_command: The @ command string (e.g., "@file.txt")
         context_manager: Context manager instance
-        
+
     Returns:
         True if this is a complete file that should be auto-added to context
     """
     if not at_command.startswith('@'):
         return False
-    
+
     file_path = at_command[1:]  # Remove @ prefix
-    
+
     # Don't auto-add if it's just "@" or ends with "/"
     if not file_path or file_path.endswith('/'):
         return False
-    
+
     # Check if it's a valid file path
     import os
     try:
@@ -445,7 +445,7 @@ def _is_complete_at_command(at_command: str, context_manager) -> bool:
             resolved_path = file_path
         else:
             resolved_path = os.path.join(os.getcwd(), file_path)
-        
+
         # Check if it's a readable file
         return os.path.isfile(resolved_path) and os.access(resolved_path, os.R_OK)
     except:
@@ -454,7 +454,7 @@ def _is_complete_at_command(at_command: str, context_manager) -> bool:
 
 def _handle_at_selection(at_command: str, context_manager, console: Console) -> None:
     """Handle automatic addition of file to context from @ autocomplete selection.
-    
+
     Args:
         at_command: The @ command string (e.g., "@file.txt")
         context_manager: Context manager instance
@@ -462,13 +462,13 @@ def _handle_at_selection(at_command: str, context_manager, console: Console) -> 
     """
     if not context_manager:
         return
-    
+
     file_path = at_command[1:]  # Remove @ prefix
-    
+
     try:
         # Add file to context
         context_manager.add_file_context(file_path)
-        
+
         # Get relative path for display
         import os
         try:
@@ -476,10 +476,10 @@ def _handle_at_selection(at_command: str, context_manager, console: Console) -> 
             display_path = rel_path if len(rel_path) < len(file_path) else file_path
         except ValueError:
             display_path = file_path
-        
+
         console.print(f"[green]Added context file: {display_path}[/green]")
         console.print(f"[dim]Context status: {context_manager.get_status_summary()}[/dim]")
-        
+
     except ValueError as e:
         console.print(f"[red]Error adding context: {e}[/red]")
     except Exception as e:

@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 from typing import Dict, Iterator, List, Optional, Tuple
 
-
 Event = Tuple[str, Optional[str]]  # ("model"|"text"|"tool_start"|"tool_input_delta"|"tool_ready"|"done"|"tokens", value)
-
 
 def _build_openai_tools(tools: List[dict]) -> List[dict]:
     """Build OpenAI tools array from tool definitions.
@@ -23,7 +21,6 @@ def _build_openai_tools(tools: List[dict]) -> List[dict]:
             }
         })
     return openai_tools
-
 
 def _build_openai_messages(messages: List[dict]) -> List[dict]:
     """Build OpenAI messages array from message history.
@@ -101,7 +98,6 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
 
     return openai_messages
 
-
 def build_payload(
     messages: List[dict], *, model: Optional[str] = None, max_tokens: Optional[int] = None, temperature: Optional[float] = None, thinking: bool = False, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, **_: dict
 ) -> dict:
@@ -157,6 +153,9 @@ def build_payload(
     body: Dict = {
         "messages": final_messages,
         "stream": True,
+        "stream_options": {
+            "include_usage": True
+        }
     }
 
     # Add reasoning parameters only when thinking mode is enabled
@@ -188,6 +187,8 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
     """
     sent_model = False
     current_tool_calls = {}  # Track ongoing tool calls by index
+    accumulated_text = ""  # Track text for fallback token estimation
+    has_finished = False  # Track if we've seen a finish_reason
 
     for data in lines:
         if data == "[DONE]":
@@ -208,6 +209,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             delta = ch.get("delta") or {}
             content = delta.get("content")
             if isinstance(content, str) and content:
+                accumulated_text += content
                 yield ("text", content)
 
             # Handle tool calls in OpenAI streaming format
@@ -239,6 +241,15 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                         current_tool_calls[index]["arguments"] += arguments
                         yield ("tool_input_delta", arguments)
 
+        # Check for tool completion first
+        for ch in choices:
+            finish_reason = ch.get("finish_reason")
+            if finish_reason == "tool_calls" and current_tool_calls:
+                for tool_call in current_tool_calls.values():
+                    yield ("tool_ready", None)
+                # Don't emit done here, let the tool execution complete
+                return
+
         # Extract token usage and cost if available
         usage = evt.get("usage")
         if usage:
@@ -246,24 +257,47 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             input_tokens = usage.get("prompt_tokens", 0)
             output_tokens = usage.get("completion_tokens", 0)
             if total_tokens > 0:
-                # Calculate cost (GPT-4o pricing: $2.50/1M input, $10/1M output)
-                input_cost = (input_tokens / 1000000) * 2.50
-                output_cost = (output_tokens / 1000000) * 10.0
+                # Calculate cost (GPT-5 pricing: $0.91/1K input, $6.77/1K output)
+                input_cost = (input_tokens / 1000) * 0.00091
+                output_cost = (output_tokens / 1000) * 0.00677
                 total_cost = input_cost + output_cost
 
                 # Format: "tokens|input_tokens|output_tokens|cost"
                 token_info = f"{total_tokens}|{input_tokens}|{output_tokens}|{total_cost:.6f}"
                 yield ("tokens", token_info)
 
-        # Signal completion if provider indicates finish
+                # If we had a previous finish_reason, now emit done after getting usage
+                if has_finished:
+                    yield ("done", None)
+                    return
+
+        # Check for completion - set flag but don't emit done yet (wait for usage)
         for ch in choices:
             finish_reason = ch.get("finish_reason")
             if finish_reason is not None:
-                # If we finished with tool_calls, emit tool_ready events
-                if finish_reason == "tool_calls" and current_tool_calls:
-                    for tool_call in current_tool_calls.values():
-                        yield ("tool_ready", None)
-                    # Don't emit done here, let the tool execution complete
-                else:
+                has_finished = True
+                # If we already have usage data in this same chunk, emit done now
+                if usage:
                     yield ("done", None)
                     return
+                # Otherwise, wait for the next chunk with usage data
+                break
+
+        # Handle case where we finished but no usage data comes (fallback estimation)
+        # This happens if we've finished and processed several chunks without usage
+        if has_finished and not usage and len(choices) == 0:
+            # This is likely the final empty chunk, trigger fallback
+            if accumulated_text:
+                estimated_output_tokens = max(1, len(accumulated_text.split()) * 1.3)
+                estimated_input_tokens = 10
+                estimated_total_tokens = int(estimated_input_tokens + estimated_output_tokens)
+
+                input_cost = (estimated_input_tokens / 1000) * 0.00091
+                output_cost = (estimated_output_tokens / 1000) * 0.00677
+                total_cost = input_cost + output_cost
+
+                token_info = f"~{estimated_total_tokens}|~{estimated_input_tokens}|~{int(estimated_output_tokens)}|{total_cost:.6f}"
+                yield ("tokens", token_info)
+
+            yield ("done", None)
+            return

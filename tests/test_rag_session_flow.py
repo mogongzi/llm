@@ -17,9 +17,11 @@ class DummyProvider:
         return lines
 
 
+from streaming_client import StreamResult
+
 def _stream_stub(url, payload, **kwargs):
-    # emulate streaming return signature
-    return "ok", 0, 0.0, []
+    # emulate streaming return signature for new API
+    return StreamResult(text="ok", tokens=0, cost=0.0, tool_calls=[])
 
 
 def test_session_passes_rag_context_to_provider(monkeypatch):
@@ -27,13 +29,8 @@ def test_session_passes_rag_context_to_provider(monkeypatch):
     session = ChatSession(
         url="http://localhost/invoke",
         provider=provider,
-        model=None,
         max_tokens=128,
-        live_window=2,
-        use_mock=True,
         timeout=1.0,
-        mock_file=None,
-        show_rule=False,
         tool_executor=None,
         context_manager=None,
         rag_manager=None,
@@ -53,8 +50,15 @@ def test_session_passes_rag_context_to_provider(monkeypatch):
 
     session.rag_manager = RM()
 
+    # Mock the streaming client to avoid actual network calls
+    class MockStreamingClient:
+        def send_message(self, url, payload, **kwargs):
+            return _stream_stub(url, payload, **kwargs)
+    
+    session.streaming_client = MockStreamingClient()
+    
     history = [{"role": "user", "content": "hello world"}]
-    session.send_message(history, use_thinking=False, tools_enabled=False, available_tools=None, stream_and_render_func=_stream_stub)
+    session.send_message(history, use_thinking=False, tools_enabled=False, available_tools=None)
 
     # Provider must have received context_content
     assert provider.last_kwargs is not None
@@ -66,21 +70,23 @@ def test_session_without_rag_has_no_context_content():
     session = ChatSession(
         url="http://localhost/invoke",
         provider=provider,
-        model=None,
         max_tokens=128,
-        live_window=2,
-        use_mock=True,
         timeout=1.0,
-        mock_file=None,
-        show_rule=False,
         tool_executor=None,
         context_manager=None,
         rag_manager=None,
         provider_name="bedrock",
     )
 
+    # Mock the streaming client to avoid actual network calls
+    class MockStreamingClient:
+        def send_message(self, url, payload, **kwargs):
+            return _stream_stub(url, payload, **kwargs)
+    
+    session.streaming_client = MockStreamingClient()
+
     history = [{"role": "user", "content": "hello"}]
-    session.send_message(history, use_thinking=False, tools_enabled=False, available_tools=None, stream_and_render_func=_stream_stub)
+    session.send_message(history, use_thinking=False, tools_enabled=False, available_tools=None)
     assert provider.last_kwargs is not None
     assert provider.last_kwargs.get("context_content") is None
 
