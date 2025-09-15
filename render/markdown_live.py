@@ -88,11 +88,9 @@ class MarkdownStream:
         self.waiting_active = True
         self.waiting_message = message
         spinner = Spinner("dots", text=Text(message, style="dim italic"), style="yellow")
-        try:
+        if self.live:
             self.live.update(spinner)
             self.live.refresh()
-        except Exception:
-            pass
 
     def stop_waiting(self) -> None:
         if not self.waiting_active:
@@ -138,15 +136,17 @@ class MarkdownStream:
             need = stable - already
             if need > 0:
                 chunk = "".join(lines[already:stable])
-                self.live.console.print(Text.from_ansi(chunk))
-                self.printed = lines[:stable]
+                if self.live:
+                    self.live.console.print(Text.from_ansi(chunk))
+                    self.printed = lines[:stable]
 
         if final:
             self.stop()
             return
 
         tail = "".join(lines[stable:])
-        self.live.update(Text.from_ansi(tail))
+        if self.live:
+            self.live.update(Text.from_ansi(tail))
 
     def add_thinking(self, text: str) -> None:
         """Add thinking text and render it streamingly with Claude Code style."""
@@ -156,7 +156,8 @@ class MarkdownStream:
             # Print header immediately
             self._ensure_live()
             header = self._render_md_lines("*Thinking...*\n")
-            self.live.console.print(Text.from_ansi("".join(header), style="dim italic"))
+            if self.live:
+                self.live.console.print(Text.from_ansi("".join(header), style="dim italic"))
 
         self.thinking_buffer.append(text)
         self._stream_thinking()
@@ -191,11 +192,12 @@ class MarkdownStream:
 
             # Display with dim italic style
             styled_text = Text.from_ansi(tail_content, style="dim italic")
-            self.live.update(styled_text)
+            if self.live:
+                self.live.update(styled_text)
 
     def _finalize_thinking(self) -> None:
         """Finalize thinking section and prepare for response."""
-        if self.in_thinking_phase:
+        if self.in_thinking_phase and self.live:
             # Print final thinking content
             current_thinking = "".join(self.thinking_buffer[1:])
             if current_thinking:

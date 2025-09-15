@@ -260,8 +260,8 @@ def test_map_events_message_stop_with_usage():
     assert int(token_parts[1]) == 100  # input
     assert int(token_parts[2]) == 50   # output
     
-    # Check cost calculation (100 * $3/1M + 50 * $15/1M)
-    expected_cost = (100 / 1000000) * 3.0 + (50 / 1000000) * 15.0
+    # Check cost calculation (Claude 4 Sonnet: $2.04/1K input, $9.88/1K output)
+    expected_cost = (100 / 1000) * 0.00204 + (50 / 1000) * 0.00988
     actual_cost = float(token_parts[3])
     assert abs(actual_cost - expected_cost) < 0.000001
     

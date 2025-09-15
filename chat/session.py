@@ -3,9 +3,7 @@
 from typing import List, Optional, Tuple
 from rich.console import Console
 
-# We'll need to import these when used in main file
-# from tools.definitions import AVAILABLE_TOOLS
-# from main streaming function will be imported
+from streaming_client import StreamingClient, StreamResult
 
 console = Console(soft_wrap=True)
 
@@ -23,9 +21,10 @@ class ChatSession:
         self.tool_executor = tool_executor
         self.context_manager = context_manager
         self.rag_manager = rag_manager
+        self.streaming_client = StreamingClient(tool_executor=tool_executor)
 
     def send_message(self, history: List[dict], use_thinking: bool, tools_enabled: bool,
-                    available_tools, stream_and_render_func) -> Tuple[str, int, float, List[dict]]:
+                    available_tools) -> StreamResult:
         """Send a message and handle the complete request/response cycle including tools."""
         # Build request payload with conditional tool support and context injection
         tools_param = available_tools if tools_enabled else None
@@ -88,25 +87,18 @@ class ChatSession:
         )
 
         # Stream initial response and capture any tool calls
-        reply_text, tokens_used, cost_used, tool_calls_made = stream_and_render_func(
+        result = self.streaming_client.send_message(
             self.url,
             payload,
             mapper=self.provider.map_events,
-            live_window=6,
-            use_mock=False,
-            timeout=self.timeout,
-            mock_file=None,
-            tool_executor=self.tool_executor,
-            use_thinking=use_thinking,
             provider_name=self.provider_name,
         )
 
-        return reply_text, tokens_used, cost_used, tool_calls_made
+        return result
 
     def handle_tool_followup(self, history: List[dict], use_thinking: bool, tools_enabled: bool,
-                           available_tools, stream_and_render_func) -> Tuple[str, int, float]:
+                           available_tools) -> StreamResult:
         """Handle follow-up request after tool execution."""
-        console.print("[dim]Getting Claude's response to tool results...[/dim]")
 
         # Follow-up request includes tool results in context
         tools_param = available_tools if tools_enabled else None
@@ -114,17 +106,11 @@ class ChatSession:
         followup_payload = self.provider.build_payload(history, model=None, max_tokens=self.max_tokens,
                                                       thinking=use_thinking, tools=tools_param, context_content=context_content)
 
-        followup_reply, followup_tokens, followup_cost, _ = stream_and_render_func(
+        result = self.streaming_client.send_message(
             self.url,
             followup_payload,
             mapper=self.provider.map_events,
-            live_window=6,
-            use_mock=False,
-            timeout=self.timeout,
-            mock_file=None,
-            tool_executor=self.tool_executor,
-            use_thinking=use_thinking,
             provider_name=self.provider_name,
         )
 
-        return followup_reply, followup_tokens, followup_cost
+        return result

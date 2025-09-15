@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for SSE client functionality.
+Test script for SSE client functionality via StreamingClient.
 """
 
 import sys
@@ -16,7 +16,7 @@ except ImportError:
 # Add parent directory to path to import our modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from util.sse_client import iter_sse_lines
+from streaming_client import StreamingClient
 
 
 def test_sse_lines_basic():
@@ -36,7 +36,8 @@ def test_sse_lines_basic():
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", json={"test": "data"}, session=mock_session))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", json={"test": "data"}, session=mock_session))
     
     expected = ["Hello world", "Second line", "Third line"]
     assert lines == expected
@@ -58,7 +59,8 @@ def test_sse_lines_data_prefix_stripping():
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", session=mock_session))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", session=mock_session))
     
     expected = ["Content with spaces", "No space after colon", "Multiple spaces", "event: some-event", "Final line"]
     assert lines == expected
@@ -81,7 +83,8 @@ def test_sse_lines_empty_line_filtering():
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", session=mock_session))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", session=mock_session))
     
     expected = ["Line 1", "Line 2", "Line 3"]
     assert lines == expected
@@ -97,7 +100,8 @@ def test_sse_lines_get_method():
     mock_session.get.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.get.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", method="GET", session=mock_session))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", method="GET", session=mock_session))
     
     assert lines == ["GET response"]
     mock_session.get.assert_called_once()
@@ -113,7 +117,8 @@ def test_sse_lines_custom_timeout():
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    list(iter_sse_lines("http://test.com", timeout=120.0, session=mock_session))
+    client = StreamingClient()
+    list(client.iter_sse_lines("http://test.com", timeout=120.0, session=mock_session))
     
     mock_session.post.assert_called_once_with(
         "http://test.com", 
@@ -135,7 +140,8 @@ def test_sse_lines_with_params():
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
     params = {"key": "value", "test": "123"}
-    list(iter_sse_lines("http://test.com", params=params, session=mock_session))
+    client = StreamingClient()
+    list(client.iter_sse_lines("http://test.com", params=params, session=mock_session))
     
     mock_session.post.assert_called_once_with(
         "http://test.com", 
@@ -146,7 +152,7 @@ def test_sse_lines_with_params():
     )
 
 
-@patch('util.sse_client.requests.Session')
+@patch('streaming_client.requests.Session')
 def test_sse_lines_default_session(mock_session_class):
     """Test SSE client creates default session when none provided."""
     mock_session = Mock()
@@ -159,7 +165,8 @@ def test_sse_lines_default_session(mock_session_class):
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", json={"test": True}))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", json={"test": True}))
     
     mock_session_class.assert_called_once()
     assert lines == ["Default session"]
@@ -175,7 +182,8 @@ def test_sse_lines_http_error():
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
     try:
-        list(iter_sse_lines("http://test.com", session=mock_session))
+        client = StreamingClient()
+        list(client.iter_sse_lines("http://test.com", session=mock_session))
         assert False, "Expected exception to be raised"
     except Exception as e:
         assert "HTTP 500 Error" in str(e)
@@ -192,7 +200,8 @@ def test_sse_lines_json_payload():
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
     json_data = {"message": "Hello", "items": [1, 2, 3]}
-    list(iter_sse_lines("http://test.com", json=json_data, session=mock_session))
+    client = StreamingClient()
+    list(client.iter_sse_lines("http://test.com", json=json_data, session=mock_session))
     
     mock_session.post.assert_called_once_with(
         "http://test.com", 
@@ -221,7 +230,8 @@ def test_sse_lines_mixed_content():
     mock_session.post.return_value.__enter__ = Mock(return_value=mock_response)
     mock_session.post.return_value.__exit__ = Mock(return_value=None)
     
-    lines = list(iter_sse_lines("http://test.com", session=mock_session))
+    client = StreamingClient()
+    lines = list(client.iter_sse_lines("http://test.com", session=mock_session))
     
     expected = [
         "event: message",

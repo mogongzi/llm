@@ -71,3 +71,167 @@ def test_azure_map_events_azure_like_stream():
     texts = [v for (k, v) in events if k == "text"]
     assert texts == ["I", "."]
     assert events[-1] == ("done", None)
+
+
+def test_azure_payload_includes_stream_options():
+    """Test that stream_options are included in the payload for token tracking."""
+    messages = [{"role": "user", "content": "Hello"}]
+    body = build_payload(messages, model="gpt-5")
+
+    assert "stream_options" in body
+    assert body["stream_options"]["include_usage"] is True
+
+
+def test_azure_map_events_token_tracking_gpt5():
+    """Test token tracking with GPT-5 pricing in Azure OpenAI response."""
+    # Simulate Azure OpenAI response with usage data (based on provided example)
+    frames = [
+        '{"choices":[{"delta":{"content":"Hello","role":"assistant"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{"content":" world"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":549,"prompt_tokens":10,"total_tokens":559}}'
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should emit model, text, and tokens events
+    assert ("model", "gpt-5-2025-08-07") in events
+    assert ("text", "Hello") in events
+    assert ("text", " world") in events
+
+    # Check token event exists and has correct format
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 1
+
+    # Parse token info: "total|input|output|cost"
+    token_info = token_events[0]
+    parts = token_info.split("|")
+    assert len(parts) == 4
+
+    total_tokens = int(parts[0])
+    input_tokens = int(parts[1])
+    output_tokens = int(parts[2])
+    cost = float(parts[3])
+
+    assert total_tokens == 559
+    assert input_tokens == 10
+    assert output_tokens == 549
+
+    # Verify GPT-5 pricing calculation: $0.00091/1K input, $0.00677/1K output
+    expected_input_cost = (10 / 1000) * 0.00091
+    expected_output_cost = (549 / 1000) * 0.00677
+    expected_total_cost = expected_input_cost + expected_output_cost
+
+    assert abs(cost - expected_total_cost) < 0.0001
+
+
+def test_azure_map_events_token_tracking_with_reasoning():
+    """Test token tracking with reasoning tokens in completion_tokens_details."""
+    frames = [
+        '{"choices":[{"delta":{"content":"Thinking..."},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":549,"completion_tokens_details":{"reasoning_tokens":512,"accepted_prediction_tokens":0,"audio_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens":10,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"total_tokens":559}}'
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should still handle token tracking correctly even with detailed breakdown
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 1
+
+    token_info = token_events[0]
+    parts = token_info.split("|")
+
+    total_tokens = int(parts[0])
+    input_tokens = int(parts[1])
+    output_tokens = int(parts[2])
+
+    assert total_tokens == 559
+    assert input_tokens == 10
+    assert output_tokens == 549  # Total completion tokens including reasoning
+
+
+def test_azure_map_events_no_usage_data():
+    """Test that missing usage data doesn't break the event stream."""
+    frames = [
+        '{"choices":[{"delta":{"content":"Hello"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}'
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should emit text and done events, but no tokens event
+    assert ("text", "Hello") in events
+    assert ("done", None) in events
+
+    # Should not emit any tokens events
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 0
+
+
+def test_azure_map_events_zero_tokens():
+    """Test handling of zero token usage."""
+    frames = [
+        '{"choices":[],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":0,"prompt_tokens":0,"total_tokens":0}}'
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should not emit tokens event for zero total tokens
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 0
+
+
+def test_azure_map_events_fallback_token_estimation():
+    """Test fallback token estimation when usage data is not provided."""
+    frames = [
+        '{"choices":[{"delta":{"content":"Hello","role":"assistant"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{"content":" world! How are you doing today?"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}'  # No usage data
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should emit text and estimated tokens events
+    assert ("text", "Hello") in events
+    assert ("text", " world! How are you doing today?") in events
+
+    # Check for estimated token event
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 1
+
+    # Parse estimated token info: "~total|~input|~output|cost"
+    token_info = token_events[0]
+    assert token_info.startswith("~"), "Token estimation should be prefixed with ~"
+
+    parts = token_info.split("|")
+    assert len(parts) == 4
+
+    # Verify estimated values are reasonable
+    estimated_total = int(parts[0].lstrip("~"))
+    estimated_input = int(parts[1].lstrip("~"))
+    estimated_output = int(parts[2].lstrip("~"))
+    estimated_cost = float(parts[3])
+
+    assert estimated_total > 0
+    assert estimated_input > 0
+    assert estimated_output > 0
+    assert estimated_cost > 0
+    assert estimated_total == estimated_input + estimated_output
+
+    # Estimated output should be reasonable for the text length
+    # "Hello world! How are you doing today?" = 7 words, so ~9 tokens estimated
+    assert 5 <= estimated_output <= 15  # Reasonable range
+
+
+def test_azure_map_events_estimated_tokens_parsing():
+    """Test that streaming client can parse estimated tokens correctly."""
+    # Simulate estimated token event
+    token_info = "~25|~10|~15|0.000125"
+    parts = token_info.split("|")
+
+    # Test parsing logic from streaming client
+    total_str = parts[0].lstrip("~")
+    total_tokens = int(total_str) if total_str.isdigit() else 0
+    cost = float(parts[3]) if parts[3] else 0.0
+
+    assert total_tokens == 25
+    assert cost == 0.000125

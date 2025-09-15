@@ -11,6 +11,7 @@ Examples:
   python3 -m debug.debug --http "hello world"                    # Raw HTTP lines
   python3 -m debug.debug --raw "hello world"                     # Plain text output
   python3 -m debug.debug --block "hello world"                   # Block-buffered Markdown
+  python3 -m debug.debug --live "hello world"                    # Test live rendering
   python3 -m debug.debug --interactive --provider azure          # Interactive mode
   python3 -m debug.debug --mock --mock-file mock.dat "test"      # Mock with custom file
 """
@@ -38,6 +39,7 @@ sys.path.append('..')
 from util.simple_pt_input import get_multiline_input
 from render.block_buffered import BlockBuffer
 from providers import get_provider
+from streaming_client import StreamingClient
 
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_PROMPT = "bold green"
@@ -292,6 +294,101 @@ def stream_response_block(url: str, provider, payload: dict, use_mock: bool = Fa
         return None
 
 
+def stream_response_live(url: str, provider, payload: dict, use_mock: bool = False,
+                        mock_file: Optional[str] = None, timeout: float = 60.0,
+                        live_window: int = 6) -> int:
+    """Stream response with live rendering using StreamingClient (--live mode)."""
+    console.print(f"[dim]Testing live rendering with StreamingClient...[/dim]")
+    
+    try:
+        # Create StreamingClient
+        client = StreamingClient()
+        
+        # Handle mock mode - use same pattern as other debug functions
+        if use_mock:
+            # For mock mode, we need to adjust URL and make GET request
+            mock_url = url.replace("/invoke", "/mock")
+            params = {}
+            if mock_file:
+                params["file"] = mock_file
+            
+            # For mock mode, we need to build the URL with query params
+            if params:
+                from urllib.parse import urlencode
+                mock_url = f"{mock_url}?{urlencode(params)}"
+            
+            # Use mock URL and empty payload for GET request
+            url = mock_url
+            payload = {}
+        
+        # Unfortunately, StreamingClient.stream_with_live_rendering doesn't support GET method
+        # For mock mode, let's use the lower-level approach
+        if use_mock:
+            # Use the iter_sse_lines method directly for GET requests
+            result_text = []
+            model_name = None
+            
+            console.rule("[bold cyan]Mock Live Rendering Test")
+            
+            from render.markdown_live import MarkdownStream
+            ms = MarkdownStream(live_window=live_window)
+            ms.start_waiting("Loading mock data...")
+            
+            try:
+                for line in client.iter_sse_lines(url, method="GET"):
+                    ms.stop_waiting()
+                    for kind, value in provider.map_events([line]):
+                        if kind == "model":
+                            model_name = value
+                            if model_name:
+                                console.rule(f"[bold cyan]{model_name}")
+                        elif kind == "text":
+                            result_text.append(value or "")
+                            ms.add_response(value or "")
+                        elif kind == "done":
+                            break
+                    
+                ms.update("".join(result_text), final=True)
+                console.print(f"\n[dim]Mock streaming completed successfully[/dim]")
+                return 0
+                
+            except Exception as e:
+                ms.stop_waiting()
+                console.print(f"[red]Mock streaming error: {e}[/red]")
+                return 1
+        else:
+            # Use live rendering method for real endpoints
+            result = client.stream_with_live_rendering(
+                url=url,
+                payload=payload,
+                mapper=provider.map_events,
+                console=console,
+                use_thinking=False,
+                provider_name=provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock",
+                show_model_name=True,
+                live_window=live_window
+            )
+            
+            # Print final results for real endpoints
+            if result.aborted:
+                console.print(f"\n[dim]Stream aborted[/dim]")
+            elif result.error:
+                console.print(f"\n[red]Error: {result.error}[/red]")
+            else:
+                console.print(f"\n[dim]Final: {result.tokens} tokens, cost ${result.cost:.4f}[/dim]")
+                if result.tool_calls:
+                    console.print(f"[dim]Tools used: {len(result.tool_calls)}[/dim]")
+            
+            return 0
+        
+    except RequestException as e:
+        console.print(f"[red]Network error[/red]: {e}")
+        return 1
+    except Exception as e:
+        console.print(f"[red]Unexpected error[/red]: {e}")
+        return 1
+
+
 def interactive_mode(url: str, provider, model: Optional[str], use_mock: bool = False,
                     mock_file: Optional[str] = None, timeout: float = 60.0,
                     live_window: int = 6) -> None:
@@ -341,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     mode_group.add_argument("--raw", action="store_true", help="Plain text output (no formatting)")
     mode_group.add_argument("--block", action="store_true", help="Block-buffered Markdown rendering")
     mode_group.add_argument("--interactive", action="store_true", help="Interactive mode with Markdown")
+    mode_group.add_argument("--live", action="store_true", help="Test live rendering with StreamingClient")
 
     # Model and token settings
     parser.add_argument("--model", help="Model name to send to provider")
@@ -393,6 +491,9 @@ def main(argv: list[str] | None = None) -> int:
         stream_response_block(url, provider, payload, args.mock, args.mock_file,
                             args.timeout, args.live_window)
         return 0
+    elif args.live:
+        return stream_response_live(url, provider, payload, args.mock, args.mock_file,
+                                  args.timeout, args.live_window)
     else:
         # Default to raw mode if no mode specified
         return stream_response_raw(url, provider, payload, args.mock, args.mock_file, args.timeout)
