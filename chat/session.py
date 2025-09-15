@@ -12,25 +12,19 @@ console = Console(soft_wrap=True)
 
 class ChatSession:
     """Orchestrates API interactions and tool execution flows."""
-    
-    def __init__(self, url: str, provider, model: Optional[str], max_tokens: int, 
-                 live_window: int, use_mock: bool, timeout: float, mock_file: Optional[str],
-                 show_rule: bool, tool_executor, context_manager=None, rag_manager=None, provider_name: str = "bedrock"):
+
+    def __init__(self, url: str, provider, max_tokens: int, timeout: float,
+                 tool_executor, context_manager=None, rag_manager=None, provider_name: str = "bedrock"):
         self.url = url
         self.provider = provider
         self.provider_name = provider_name
-        self.model = model
         self.max_tokens = max_tokens
-        self.live_window = live_window
-        self.use_mock = use_mock
         self.timeout = timeout
-        self.mock_file = mock_file
-        self.show_rule = show_rule
         self.tool_executor = tool_executor
         self.context_manager = context_manager
         self.rag_manager = rag_manager
-    
-    def send_message(self, history: List[dict], use_thinking: bool, tools_enabled: bool, 
+
+    def send_message(self, history: List[dict], use_thinking: bool, tools_enabled: bool,
                     available_tools, stream_and_render_func) -> Tuple[str, int, float, List[dict]]:
         """Send a message and handle the complete request/response cycle including tools."""
         # Build request payload with conditional tool support and context injection
@@ -84,7 +78,7 @@ class ChatSession:
 
         payload = self.provider.build_payload(
             messages_for_llm,
-            model=self.model,
+            model=None,
             max_tokens=self.max_tokens,
             thinking=use_thinking,
             tools=tools_param,
@@ -92,47 +86,45 @@ class ChatSession:
             rag_enabled=rag_enabled,
             **extra_kwargs,
         )
-        
+
         # Stream initial response and capture any tool calls
         reply_text, tokens_used, cost_used, tool_calls_made = stream_and_render_func(
             self.url,
             payload,
             mapper=self.provider.map_events,
-            live_window=self.live_window,
-            use_mock=self.use_mock,
+            live_window=6,
+            use_mock=False,
             timeout=self.timeout,
-            mock_file=self.mock_file,
-            show_rule=self.show_rule,
+            mock_file=None,
             tool_executor=self.tool_executor,
             use_thinking=use_thinking,
             provider_name=self.provider_name,
         )
-        
+
         return reply_text, tokens_used, cost_used, tool_calls_made
-    
-    def handle_tool_followup(self, history: List[dict], use_thinking: bool, tools_enabled: bool, 
+
+    def handle_tool_followup(self, history: List[dict], use_thinking: bool, tools_enabled: bool,
                            available_tools, stream_and_render_func) -> Tuple[str, int, float]:
         """Handle follow-up request after tool execution."""
         console.print("[dim]Getting Claude's response to tool results...[/dim]")
-        
+
         # Follow-up request includes tool results in context
         tools_param = available_tools if tools_enabled else None
         context_content = self.context_manager.format_context_for_llm() if self.context_manager else None
-        followup_payload = self.provider.build_payload(history, model=self.model, max_tokens=self.max_tokens, 
+        followup_payload = self.provider.build_payload(history, model=None, max_tokens=self.max_tokens,
                                                       thinking=use_thinking, tools=tools_param, context_content=context_content)
-        
+
         followup_reply, followup_tokens, followup_cost, _ = stream_and_render_func(
             self.url,
-            followup_payload, 
+            followup_payload,
             mapper=self.provider.map_events,
-            live_window=self.live_window,
-            use_mock=self.use_mock,
+            live_window=6,
+            use_mock=False,
             timeout=self.timeout,
-            mock_file=self.mock_file,
-            show_rule=False,  # Skip model header for follow-up
+            mock_file=None,
             tool_executor=self.tool_executor,
             use_thinking=use_thinking,
             provider_name=self.provider_name,
         )
-        
+
         return followup_reply, followup_tokens, followup_cost

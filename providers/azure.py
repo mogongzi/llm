@@ -9,7 +9,7 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"tool_start"|"tool_input_de
 
 def _build_openai_tools(tools: List[dict]) -> List[dict]:
     """Build OpenAI tools array from tool definitions.
-    
+
     Takes abstract tool definitions and constructs OpenAI-specific format.
     """
     openai_tools = []
@@ -27,20 +27,20 @@ def _build_openai_tools(tools: List[dict]) -> List[dict]:
 
 def _build_openai_messages(messages: List[dict]) -> List[dict]:
     """Build OpenAI messages array from message history.
-    
+
     Handles message format differences for OpenAI API.
     """
     openai_messages = []
-    
+
     for message in messages:
         role = message.get("role")
         content = message.get("content")
-        
+
         if role == "assistant" and isinstance(content, list):
             # Assistant message with structured content
             tool_calls = []
             text_content = ""
-            
+
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     tool_calls.append({
@@ -55,7 +55,7 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
                     text_content += block.get("text", "")
                 elif isinstance(block, str):
                     text_content += block
-            
+
             openai_message = {"role": "assistant"}
             if text_content:
                 openai_message["content"] = text_content
@@ -63,16 +63,16 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
                 openai_message["tool_calls"] = tool_calls
                 if not text_content:
                     openai_message["content"] = None
-            
+
             openai_messages.append(openai_message)
-            
+
         elif role == "user" and isinstance(content, list):
             # User message with structured content
             has_tool_results = any(
-                isinstance(block, dict) and block.get("type") == "tool_result" 
+                isinstance(block, dict) and block.get("type") == "tool_result"
                 for block in content
             )
-            
+
             if has_tool_results:
                 # Convert tool results to separate tool messages
                 for block in content:
@@ -90,7 +90,7 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
                         text_content += block.get("text", "")
                     elif isinstance(block, str):
                         text_content += block
-                
+
                 openai_messages.append({
                     "role": "user",
                     "content": text_content or content
@@ -98,7 +98,7 @@ def _build_openai_messages(messages: List[dict]) -> List[dict]:
         else:
             # Standard message format
             openai_messages.append(message)
-    
+
     return openai_messages
 
 
@@ -108,7 +108,7 @@ def build_payload(
     """Construct an Azure/OpenAI Chat Completions streaming payload.
 
     Requires `model`. Includes `stream: true`.
-    
+
     Args:
         messages: List of conversation messages (any format)
         model: Model name (e.g., "gpt-4o")
@@ -116,13 +116,13 @@ def build_payload(
         temperature: Sampling temperature
         thinking: Enable reasoning mode (adds reasoning_effort and verbosity params)
         tools: List of tool definitions (abstract format)
-    
+
     Returns:
         OpenAI-compatible request payload
     """
     # Build OpenAI-compatible messages
     openai_messages = _build_openai_messages(messages)
-    
+
     # Add system prompt if not already present
     final_messages = openai_messages.copy()
     if not openai_messages or openai_messages[0].get("role") != "system":
@@ -158,7 +158,7 @@ def build_payload(
         "messages": final_messages,
         "stream": True,
     }
-    
+
     # Add reasoning parameters only when thinking mode is enabled
     if thinking:
         body["reasoning_effort"] = "medium"
@@ -188,7 +188,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
     """
     sent_model = False
     current_tool_calls = {}  # Track ongoing tool calls by index
-    
+
     for data in lines:
         if data == "[DONE]":
             yield ("done", None)
@@ -209,7 +209,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
             content = delta.get("content")
             if isinstance(content, str) and content:
                 yield ("text", content)
-                
+
             # Handle tool calls in OpenAI streaming format
             tool_calls = delta.get("tool_calls")
             if tool_calls:
@@ -217,7 +217,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                     index = tool_call.get("index", 0)
                     tool_id = tool_call.get("id")
                     function = tool_call.get("function") or {}
-                    
+
                     # Initialize tool call tracking if new
                     if index not in current_tool_calls:
                         name = function.get("name", "")
@@ -232,7 +232,7 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
                                 "id": tool_id,
                                 "name": name
                             }))
-                    
+
                     # Accumulate function arguments
                     arguments = function.get("arguments", "")
                     if arguments and index in current_tool_calls:

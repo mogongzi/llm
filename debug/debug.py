@@ -3,16 +3,16 @@
 Unified LLM Debug Client
 
 Combines functionality from debug_cli.py and try.py:
-- Raw HTTP/SSE inspection 
+- Raw HTTP/SSE inspection
 - Block-buffered Markdown streaming
 - Provider testing with various parameters
 
 Examples:
-  python3 debug/debug.py --http "hello world"                    # Raw HTTP lines
-  python3 debug/debug.py --raw "hello world"                     # Plain text output  
-  python3 debug/debug.py --block "hello world"                   # Block-buffered Markdown
-  python3 debug/debug.py --interactive --provider azure          # Interactive mode
-  python3 debug/debug.py --mock --mock-file custom.dat "test"    # Mock with custom file
+  python3 -m debug.debug --http "hello world"                    # Raw HTTP lines
+  python3 -m debug.debug --raw "hello world"                     # Plain text output
+  python3 -m debug.debug --block "hello world"                   # Block-buffered Markdown
+  python3 -m debug.debug --interactive --provider azure          # Interactive mode
+  python3 -m debug.debug --mock --mock-file mock.dat "test"      # Mock with custom file
 """
 
 import sys
@@ -24,7 +24,6 @@ import termios
 import tty
 import threading
 import queue
-from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional
 
@@ -33,7 +32,6 @@ from requests.exceptions import RequestException
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.text import Text
-from rich.prompt import Prompt
 
 # Add parent directory to path for imports
 sys.path.append('..')
@@ -140,7 +138,7 @@ class SSEReader(threading.Thread):
                 pass
 
 
-def stream_response_http(url: str, provider, payload: dict, use_mock: bool = False, 
+def stream_response_http(url: str, provider, payload: dict, use_mock: bool = False,
                         mock_file: Optional[str] = None, timeout: float = 60.0) -> int:
     """Stream response showing raw HTTP lines (--http mode)."""
     try:
@@ -153,7 +151,7 @@ def stream_response_http(url: str, provider, payload: dict, use_mock: bool = Fal
         else:
             method = "POST"
             response = requests.post(url, json=payload, stream=True, timeout=timeout)
-        
+
         with response:
             if not response.ok:
                 print(f"HTTP {response.status_code}: {response.text}", file=sys.stderr)
@@ -181,7 +179,7 @@ def stream_response_raw(url: str, provider, payload: dict, use_mock: bool = Fals
             response = requests.get(url, params=params or None, stream=True, timeout=timeout)
         else:
             response = requests.post(url, json=payload, stream=True, timeout=timeout)
-        
+
         with response:
             if not response.ok:
                 print(f"HTTP {response.status_code}: {response.text}", file=sys.stderr)
@@ -223,7 +221,7 @@ def stream_response_block(url: str, provider, payload: dict, use_mock: bool = Fa
     """Stream response with block-buffered Markdown rendering (--block mode)."""
     global _abort
     _abort = False
-    
+
     try:
         if use_mock:
             params = {}
@@ -232,7 +230,7 @@ def stream_response_block(url: str, provider, payload: dict, use_mock: bool = Fa
             response = requests.get(url, params=params or None, stream=True, timeout=timeout)
         else:
             response = requests.post(url, json=payload, stream=True, timeout=timeout)
-        
+
         with response:
             if not response.ok:
                 pretty_http_error(response)
@@ -303,7 +301,7 @@ def interactive_mode(url: str, provider, model: Optional[str], use_mock: bool = 
 
     while True:
         try:
-            user_input = get_multiline_input(console, COLOR_PROMPT)
+            user_input, _, _, _ = get_multiline_input(console, COLOR_PROMPT)
             if user_input is None:
                 console.print("[dim]Bye![/dim]")
                 return
@@ -330,33 +328,33 @@ def to_mock_url(url: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point with unified argument parsing."""
     parser = argparse.ArgumentParser(description="Unified LLM debug client with multiple output modes")
-    
+
     # Core connection settings
     parser.add_argument("prompt", nargs="*", help="Prompt text to send (not used in interactive mode)")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default: {DEFAULT_URL})")
-    parser.add_argument("--provider", default="bedrock", choices=["bedrock", "azure"], 
+    parser.add_argument("--provider", default="bedrock", choices=["bedrock", "azure"],
                        help="Provider adapter to use (default: bedrock)")
-    
+
     # Output mode selection (mutually exclusive)
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument("--http", action="store_true", help="Print raw HTTP/SSE lines")
     mode_group.add_argument("--raw", action="store_true", help="Plain text output (no formatting)")
     mode_group.add_argument("--block", action="store_true", help="Block-buffered Markdown rendering")
     mode_group.add_argument("--interactive", action="store_true", help="Interactive mode with Markdown")
-    
+
     # Model and token settings
     parser.add_argument("--model", help="Model name to send to provider")
     parser.add_argument("--max-tokens", type=int, help="Max tokens for provider payload")
-    
+
     # Mock/testing settings
     parser.add_argument("--mock", action="store_true", help="Use mock endpoint instead of real provider")
     parser.add_argument("--mock-file", help="Mock data file to stream")
     parser.add_argument("--mock-delay", type=int, default=0, help="Mock delay in milliseconds")
-    
+
     # Debug/tuning settings
     parser.add_argument("--timeout", type=float, default=60.0, help="HTTP timeout in seconds")
     parser.add_argument("--live-window", type=int, default=6, help="Live rendering window size")
-    
+
     args = parser.parse_args(argv)
 
     # Validate arguments
@@ -371,10 +369,10 @@ def main(argv: list[str] | None = None) -> int:
     # Get provider and build URL
     provider = get_provider(args.provider)
     url = to_mock_url(args.url) if args.mock else args.url
-    
+
     # Handle interactive mode
     if args.interactive:
-        interactive_mode(url, provider, args.model, args.mock, args.mock_file, 
+        interactive_mode(url, provider, args.model, args.mock, args.mock_file,
                         args.timeout, args.live_window)
         return 0
 
@@ -392,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.raw:
         return stream_response_raw(url, provider, payload, args.mock, args.mock_file, args.timeout)
     elif args.block:
-        stream_response_block(url, provider, payload, args.mock, args.mock_file, 
+        stream_response_block(url, provider, payload, args.mock, args.mock_file,
                             args.timeout, args.live_window)
         return 0
     else:

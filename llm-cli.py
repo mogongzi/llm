@@ -19,7 +19,6 @@ Notes
 from __future__ import annotations
 
 import argparse
-import os
 import signal
 import sys
 from typing import List, Optional, Tuple
@@ -66,7 +65,6 @@ def stream_and_render(
     use_mock: bool = False,
     timeout: float = 30.0,
     mock_file: Optional[str] = None,
-    show_rule: bool = True,
     tool_executor: Optional[ToolExecutor] = None,
     use_thinking: bool = False,
     provider_name: str = "bedrock",
@@ -122,7 +120,7 @@ def stream_and_render(
                         # Model name received - stop waiting and show header
                         ms.stop_waiting()
                         model_name = value or model_name
-                        if show_rule and model_name:
+                        if model_name:
                             console.rule(f"[bold {COLOR_MODEL}]{model_name}")
                     elif kind == "thinking":
                         # Thinking content received - render in special thinking mode
@@ -314,17 +312,12 @@ def repl(
     path_browser = PathBrowser()
     # Extract provider name from module name (e.g., "providers.azure" -> "azure")
     provider_name = provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock"
-    
+
     session = ChatSession(
         url=url,
         provider=provider,
-        model=None,  # Model selection moved to debug script
         max_tokens=4096,  # Default max tokens
-        live_window=6,  # Default live window size
-        use_mock=False,  # Mock mode moved to debug script
         timeout=60.0,  # Default timeout
-        mock_file=None,  # Mock file moved to debug script
-        show_rule=True,  # Always show rule header
         tool_executor=tool_executor,
         context_manager=context_manager,
         rag_manager=rag_manager,
