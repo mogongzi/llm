@@ -94,10 +94,7 @@ def stream_and_render(
         params = {}
         if use_mock and mock_file:
             params["file"] = mock_file
-        # Pass through optional mock delay from env var set by argparse
-        mock_delay = os.getenv("LLM_MOCK_DELAY_MS")
-        if use_mock and mock_delay:
-            params["delay_ms"] = mock_delay
+        # Mock delay handled by debug script only
         method = "GET" if use_mock else "POST"
         # Enable raw terminal mode for ESC detection
         try:
@@ -296,15 +293,8 @@ def format_tool_messages(tool_calls_made: List[dict]) -> List[dict]:
 
 def repl(
     url: str,
-    live_window: int,
     *,
-    use_mock: bool,
-    timeout: float,
-    mock_file: Optional[str],
-    show_rule: bool,
     provider,
-    model: Optional[str],
-    max_tokens: int,
 ) -> int:
     """Interactive chat loop with conversation history and tool support.
 
@@ -328,13 +318,13 @@ def repl(
     session = ChatSession(
         url=url,
         provider=provider,
-        model=model,
-        max_tokens=max_tokens,
-        live_window=live_window,
-        use_mock=use_mock,
-        timeout=timeout,
-        mock_file=mock_file,
-        show_rule=show_rule,
+        model=None,  # Model selection moved to debug script
+        max_tokens=4096,  # Default max tokens
+        live_window=6,  # Default live window size
+        use_mock=False,  # Mock mode moved to debug script
+        timeout=60.0,  # Default timeout
+        mock_file=None,  # Mock file moved to debug script
+        show_rule=True,  # Always show rule header
         tool_executor=tool_executor,
         context_manager=context_manager,
         rag_manager=rag_manager,
@@ -397,15 +387,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     """CLI entry point with argument parsing and signal handling."""
     parser = argparse.ArgumentParser(prog="llm-cli", description="Stream LLM responses as live-rendered Markdown")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Endpoint URL (default {DEFAULT_URL})")
-    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "bedrock"), choices=["bedrock", "azure"], help="Provider adapter to use (default: bedrock)")
-    parser.add_argument("--model", help="Model name to send to provider (e.g., gpt-4o, claude-3)")
-    parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens for provider payload (default 4096)")
-    parser.add_argument("--mock", action="store_true", help="Use /mock endpoint (GET) instead of POST /invoke")
-    parser.add_argument("--mock-file", help="Mock data file to stream (maps to /mock?file=...)")
-    parser.add_argument("--mock-delay", type=int, default=0, help="Initial delay in ms before first mock chunk (maps to /mock?delay_ms=...)")
-    parser.add_argument("--live-window", type=int, default=6, help="Lines to repaint live (default 6)")
-    parser.add_argument("--timeout", type=float, default=60.0, help="HTTP timeout in seconds (default 60)")
-    parser.add_argument("--no-rule", action="store_true", help="Do not print the model rule header")
+    parser.add_argument("--provider", default="bedrock", choices=["bedrock", "azure"], help="Provider adapter to use (default: bedrock)")
     args = parser.parse_args(argv)
 
     # Setup signal handlers for graceful stream abortion
@@ -424,25 +406,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     except Exception:
         pass  # Signal setup not supported on platform
 
-    # Resolve endpoint URL from args or environment
-    endpoint = args.url or os.getenv("LLM_URL", DEFAULT_URL)
+    # Use endpoint URL from args with default fallback
+    endpoint = args.url
     provider = get_provider(args.provider)
-    # Configure mock mode with optional delay
-    if args.mock:
-        endpoint = to_mock_url(endpoint)
-        if args.mock_delay and args.mock_delay > 0:
-            os.environ["LLM_MOCK_DELAY_MS"] = str(args.mock_delay)
 
     return repl(
         endpoint,
-        args.live_window,
-        use_mock=args.mock,
-        timeout=args.timeout,
-        mock_file=args.mock_file,
-        show_rule=not args.no_rule,
         provider=provider,
-        model=args.model,
-        max_tokens=args.max_tokens,
     )
 
 
