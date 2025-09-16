@@ -1,8 +1,9 @@
 // Node 18+ (uses built-in fetch). Save as ai-core-proxy.js
-require("dotenv").config();
-const express = require("express");
-const { Readable } = require("stream");
-const { Buffer } = require("buffer");
+import "dotenv/config";
+import express from "express";
+import { Readable } from "stream";
+import { Buffer } from "buffer";
+import { promises as fs } from "node:fs";
 
 const {
   OAUTH_TOKEN_URL,
@@ -16,7 +17,6 @@ const {
 console.log(LLM_API_ENDPOINT);
 
 const app = express();
-const fs = require("node:fs/promises");
 
 app.get("/mock", async (req, res) => {
   const filePath = req.query.file || "mock.dat";
@@ -123,13 +123,13 @@ app.post("/invoke", async (req, res) => {
     if (bodyBuf) {
       try {
         const requestData = JSON.parse(bodyBuf.toString());
-        console.log("=== Received Request ===");
+        console.log("==== Received Request ====");
         console.log(JSON.stringify(requestData, null, 2));
-        console.log("=====================");
+        console.log("=======================");
       } catch (e) {
-        console.log("=== Raw Request Body ===");
+        console.log("==== Raw Request Body ====");
         console.log(bodyBuf.toString());
-        console.log("=====================");
+        console.log("=======================");
       }
     }
 
@@ -163,11 +163,11 @@ app.post("/invoke", async (req, res) => {
     const nodeStream = Readable.fromWeb(upstreamResp.body);
 
     // Log response chunks to console
-    console.log("=== API Response ===");
+    console.log("==== API Response ====");
     nodeStream.on("data", (chunk) => {
       console.log(chunk.toString());
     });
-    console.log("========================");
+    console.log("==========================");
 
     nodeStream.on("error", (e) => {
       if (!res.headersSent) res.status(502);

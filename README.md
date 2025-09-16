@@ -1,17 +1,16 @@
 **Overview**
 
 - **Purpose:** Stream LLM responses over SSE and render Markdown cleanly in the terminal.
-- **Clients:** `llm-cli.py` (polished live Markdown), `debug/try.py` (block-buffered), `debug/debug_cli.py` (raw/http debug).
+- **Clients:** `llm-cli.py` (polished live Markdown) and `debug/debug.py` (unified debug client: raw/http, block-buffered, live, interactive).
 - **Proxy:** `ai-server/ai-core-proxy.js` forwards to your provider with OAuth client credentials and exposes `/invoke`, `/mock`, and `/healthz`.
 
 **Quick Start**
 
-- **Prerequisites:** Node 18+, Python 3.9+, `pip install rich requests`.
+- **Prerequisites:** Node 18+, Python 3.9+, `pip install rich requests prompt-toolkit`.
 - **Install proxy deps:** `cd ai-server && npm ci`
 - **Start proxy:** `npm start` (run from `ai-server`)
-- **Run client (mock):** `python3 llm-cli.py --mock` (streams `ai-server/mock.dat`)
-- **Run client (provider):** `python3 llm-cli.py --url http://127.0.0.1:8000/invoke`
-- **Useful flags:** `--mock-file path/to/file.dat`, `--timeout 90`, `--live-window 6`, `--no-rule`
+- **Run client (provider):** `python3 llm-cli.py --provider bedrock --url http://127.0.0.1:8000/invoke`
+- **Run client (mock):** `python3 llm-cli.py --url http://127.0.0.1:8000/mock` (main CLI uses `/mock` URL; advanced mock flags are in the debug client)
 
 **RAG (Retrieval‑Augmented Generation)**
 
@@ -35,10 +34,12 @@ Notes
 **Mock Mode**
 
 - **Start proxy:** `cd ai-server && npm start`
-- **Stream mock data:** `python3 llm-cli.py --mock`
+- **Main CLI:** `python3 llm-cli.py --url http://127.0.0.1:8000/mock`
+- **Debug client:** `python3 -m debug.debug --mock "your prompt"`
 - **Notes:**
-  - Hits `http://127.0.0.1:8000/mock` and streams frames from `ai-server/mock.dat`.
-  - Override file: `GET /mock?file=path/to/file.dat`.
+  - Mock endpoint streams frames from `ai-server/mock.dat` by default.
+  - Override file: `--mock-file ai-server/mock.dat` (debug client) or `GET /mock?file=path/to/file.dat`.
+  - Add delay: `--mock-delay 250` or `LLM_MOCK_DELAY_MS=250`.
 
 **Provider Mode**
 
@@ -50,9 +51,14 @@ Notes
 
 **CLIs**
 
-- `llm-cli.py`: live Markdown with stable scroll back, headings, and code blocks. Supports `--provider` (`bedrock` [Bedrock Anthropic] or `azure` [Azure OpenAI]).
-- `debug/try.py`: prints only completed blocks (paragraphs/fenced code); abort with `q`. Supports `--provider`.
-- `debug/debug_cli.py`: `--http` prints raw SSE lines; default prints plain text chunks. Supports `--provider`.
+- `llm-cli.py` (main): Live Markdown with stable scrollback, thinking/tool toggles, file context, and RAG. Flags: `--url`, `--provider {bedrock,azure}`.
+- `debug/debug.py` (unified):
+  - `--http` raw SSE lines
+  - `--raw` plain text
+  - `--block` block-buffered Markdown
+  - `--live` live rendering via StreamingClient
+  - `--interactive` interactive block-buffered mode
+  - Extras: `--mock`, `--mock-file`, `--mock-delay`, `--timeout`, `--live-window`, `--model`, `--max-tokens`.
 
 **Context Files**
 
@@ -70,31 +76,34 @@ Notes
 - **Auth errors:** Check `.env` values and that OAuth client can request `client_credentials` tokens.
 - **CORS/headers:** Proxy mirrors upstream `content-*` headers and streams body as-is.
 - **Network timeouts:** Clients use a 60s timeout; adjust if your provider is slow.
-- **Abort:** `Ctrl+C` anywhere; `q` during `try.py` streaming.
+- **Abort:** Press `Esc` during streaming (main CLI and debug live/block). `Ctrl+C` exits program.
 
 **Project Structure**
 
-- `llm-cli.py`: Main Python CLI; streams SSE, renders live Markdown, supports tool calls.
-- `ai-server/`: Node 18+ proxy exposing `/invoke`, `/mock`, `/healthz`; configure via `.env`.
-- `providers/`: Provider adapters mapping raw SSE to events (`bedrock`, `azure`).
-- `render/`: Live vs block‑buffered rendering utilities.
-- `tools/`: Built‑in tools and executor.
+- `llm-cli.py`: Main Python CLI; streams SSE, renders live Markdown, supports tools, context, and RAG.
+- `streaming_client.py`: SSE client + live renderer integration and tool execution wiring.
+- `chat/`: Conversation/session orchestration, usage tracking, tool workflow glue.
 - `context/`: Context manager for attaching local files to prompts.
 - `rag/`: Naive TF‑IDF chunked indexer and manager (persistence, retrieval, context formatting).
-- `debug/`: Local CLI/renderer tools (`try.py`, `debug_cli.py`).
-- `tests/`: Python tests (pytest) for parsing, rendering, and RAG.
+- `providers/`: Provider adapters mapping raw SSE to events (`bedrock`, `azure`).
+- `render/`: Live and block‑buffered rendering utilities.
+- `tools/`: Built‑in tools and executor.
+- `debug/`: Unified debug client (`debug.py`).
+- `ai-server/`: Node 18+ proxy exposing `/invoke`, `/mock`, `/healthz`; configure via `.env`.
+- `tests/`: Python tests (pytest) for parsing, rendering, providers, and RAG.
 
 **Flags and Env**
 
-- CLI flags: `--model`, `--max-tokens 4096`, `--mock-file`, `--mock-delay`, `--timeout 90`, `--live-window 6`, `--no-rule`.
-- Env overrides: `LLM_URL`, `LLM_PROVIDER` (`bedrock`|`azure`), `LLM_MOCK_DELAY_MS`.
+- Main CLI: `--url`, `--provider {bedrock,azure}` (toggle thinking, tools, context, and RAG inside the REPL).
+- Debug client: `--http|--raw|--block|--live|--interactive`, plus `--mock`, `--mock-file`, `--mock-delay`, `--timeout`, `--live-window`, `--model`, `--max-tokens`.
+- Env overrides: `LLM_MOCK_DELAY_MS` (mock delay for proxy/debug), provider creds via `ai-server/.env`.
 
 **Testing**
 
 - Install: `pip install pytest`
 - Run all tests: `pytest -q`
 - Recommended flows:
-  - Start proxy, then `python3 llm-cli.py --mock` to validate SSE rendering.
+  - Start proxy, then validate rendering via main CLI with `--url http://127.0.0.1:8000/mock` or via debug client `--http/--block/--live`.
   - Use `/rag index naive <path>` and `/rag search "query"` to validate retrieval output.
 
 **Security & Configuration**
