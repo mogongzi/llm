@@ -301,3 +301,19 @@ def map_events(lines: Iterator[str]) -> Iterator[Event]:
 
             yield ("done", None)
             return
+
+    # Handle end of stream - if we had a finish_reason but never got usage data
+    if has_finished:
+        if accumulated_text:
+            estimated_output_tokens = max(1, len(accumulated_text.split()) * 1.3)
+            estimated_input_tokens = 10
+            estimated_total_tokens = int(estimated_input_tokens + estimated_output_tokens)
+
+            input_cost = (estimated_input_tokens / 1000) * 0.00091
+            output_cost = (estimated_output_tokens / 1000) * 0.00677
+            total_cost = input_cost + output_cost
+
+            token_info = f"~{estimated_total_tokens}|~{estimated_input_tokens}|~{int(estimated_output_tokens)}|{total_cost:.6f}"
+            yield ("tokens", token_info)
+
+        yield ("done", None)
