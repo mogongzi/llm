@@ -84,11 +84,12 @@ def test_azure_payload_includes_stream_options():
 
 def test_azure_map_events_token_tracking_gpt5():
     """Test token tracking with GPT-5 pricing in Azure OpenAI response."""
-    # Simulate Azure OpenAI response with usage data (based on provided example)
+    # Simulate Azure OpenAI response with usage data (based on actual API behavior)
     frames = [
         '{"choices":[{"delta":{"content":"Hello","role":"assistant"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
         '{"choices":[{"delta":{"content":" world"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
-        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":549,"prompt_tokens":10,"total_tokens":559}}'
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":549,"prompt_tokens":10,"total_tokens":559}}'
     ]
 
     events = list(map_events(iter(frames)))
@@ -150,7 +151,7 @@ def test_azure_map_events_token_tracking_with_reasoning():
 
 
 def test_azure_map_events_no_usage_data():
-    """Test that missing usage data doesn't break the event stream."""
+    """Test that missing usage data triggers fallback estimation."""
     frames = [
         '{"choices":[{"delta":{"content":"Hello"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
         '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}'
@@ -158,13 +159,17 @@ def test_azure_map_events_no_usage_data():
 
     events = list(map_events(iter(frames)))
 
-    # Should emit text and done events, but no tokens event
+    # Should emit text and done events, plus estimated tokens
     assert ("text", "Hello") in events
     assert ("done", None) in events
 
-    # Should not emit any tokens events
+    # Should emit estimated tokens as fallback
     token_events = [v for (k, v) in events if k == "tokens"]
-    assert len(token_events) == 0
+    assert len(token_events) == 1
+
+    # Should be marked as estimated
+    token_info = token_events[0]
+    assert token_info.startswith("~"), "Should use estimated tokens when usage data is missing"
 
 
 def test_azure_map_events_zero_tokens():
@@ -185,7 +190,8 @@ def test_azure_map_events_fallback_token_estimation():
     frames = [
         '{"choices":[{"delta":{"content":"Hello","role":"assistant"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
         '{"choices":[{"delta":{"content":" world! How are you doing today?"},"finish_reason":null,"index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
-        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}'  # No usage data
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',  # finish_reason
+        '{"choices":[],"created":1757928640,"id":"test","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}'  # Empty chunk, no usage data
     ]
 
     events = list(map_events(iter(frames)))
@@ -235,3 +241,47 @@ def test_azure_map_events_estimated_tokens_parsing():
 
     assert total_tokens == 25
     assert cost == 0.000125
+
+
+def test_azure_map_events_real_world_sequence():
+    """Test with real Azure OpenAI response sequence from actual logs."""
+    frames = [
+        '{"choices":[{"delta":{"content":"Here","role":"assistant"},"finish_reason":null,"index":0}],"created":1757929526,"id":"chatcmpl-CG03ypUtcd7zUw0jqTuFwJFmPFWqb","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{"content":"\'s a simple"},"finish_reason":null,"index":0}],"created":1757929526,"id":"chatcmpl-CG03ypUtcd7zUw0jqTuFwJFmPFWqb","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{"content":" Hello, world!"},"finish_reason":null,"index":0}],"created":1757929526,"id":"chatcmpl-CG03ypUtcd7zUw0jqTuFwJFmPFWqb","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1757929526,"id":"chatcmpl-CG03ypUtcd7zUw0jqTuFwJFmPFWqb","model":"gpt-5-2025-08-07","object":"chat.completion.chunk"}',
+        '{"choices":[],"created":1757929526,"id":"chatcmpl-CG03ypUtcd7zUw0jqTuFwJFmPFWqb","model":"gpt-5-2025-08-07","object":"chat.completion.chunk","usage":{"completion_tokens":799,"completion_tokens_details":{"reasoning_tokens":704},"prompt_tokens":24,"total_tokens":823}}'
+    ]
+
+    events = list(map_events(iter(frames)))
+
+    # Should emit model, text chunks, tokens, and done
+    assert ("model", "gpt-5-2025-08-07") in events
+    assert ("text", "Here") in events
+    assert ("text", "'s a simple") in events
+    assert ("text", " Hello, world!") in events
+    assert ("done", None) in events
+
+    # Check token event
+    token_events = [v for (k, v) in events if k == "tokens"]
+    assert len(token_events) == 1
+
+    token_info = token_events[0]
+    parts = token_info.split("|")
+    assert len(parts) == 4
+
+    total_tokens = int(parts[0])
+    input_tokens = int(parts[1])
+    output_tokens = int(parts[2])
+    cost = float(parts[3])
+
+    # Verify actual values from logs
+    assert total_tokens == 823
+    assert input_tokens == 24
+    assert output_tokens == 799
+
+    # Verify GPT-5 cost calculation
+    expected_input_cost = (24 / 1000) * 0.00091
+    expected_output_cost = (799 / 1000) * 0.00677
+    expected_total_cost = expected_input_cost + expected_output_cost
+    assert abs(cost - expected_total_cost) < 0.0001
