@@ -87,6 +87,16 @@ def build_payload(provider, user_input: str, *, model: Optional[str] = None, max
     return provider.build_payload(messages, model=model, **kwargs)
 
 
+def build_mock_payload(mock_file: Optional[str], mock_delay: Optional[int]) -> dict:
+    """Build payload for mock proxy requests."""
+    payload: dict[str, object] = {}
+    if mock_file:
+        payload["file"] = mock_file
+    if mock_delay is not None:
+        payload["delay_ms"] = mock_delay
+    return payload
+
+
 def pretty_http_error(resp: requests.Response) -> None:
     """Pretty print HTTP error responses."""
     try:
@@ -141,18 +151,14 @@ class SSEReader(threading.Thread):
 
 
 def stream_response_http(url: str, provider, payload: dict, use_mock: bool = False,
-                        mock_file: Optional[str] = None, timeout: float = 60.0) -> int:
+                        mock_file: Optional[str] = None, mock_delay: Optional[int] = None,
+                        timeout: float = 60.0) -> int:
     """Stream response showing raw HTTP lines (--http mode)."""
     try:
         if use_mock:
-            method = "GET"
-            params = {}
-            if mock_file:
-                params["file"] = mock_file
-            response = requests.get(url, params=params or None, stream=True, timeout=timeout)
-        else:
-            method = "POST"
-            response = requests.post(url, json=payload, stream=True, timeout=timeout)
+            payload = build_mock_payload(mock_file, mock_delay) or {}
+
+        response = requests.post(url, json=payload, stream=True, timeout=timeout)
 
         with response:
             if not response.ok:
@@ -171,16 +177,13 @@ def stream_response_http(url: str, provider, payload: dict, use_mock: bool = Fal
 
 
 def stream_response_raw(url: str, provider, payload: dict, use_mock: bool = False,
-                       mock_file: Optional[str] = None, timeout: float = 60.0) -> int:
+                       mock_file: Optional[str] = None, mock_delay: Optional[int] = None,
+                       timeout: float = 60.0) -> int:
     """Stream response as plain text (--raw mode)."""
     try:
         if use_mock:
-            params = {}
-            if mock_file:
-                params["file"] = mock_file
-            response = requests.get(url, params=params or None, stream=True, timeout=timeout)
-        else:
-            response = requests.post(url, json=payload, stream=True, timeout=timeout)
+            payload = build_mock_payload(mock_file, mock_delay) or {}
+        response = requests.post(url, json=payload, stream=True, timeout=timeout)
 
         with response:
             if not response.ok:
@@ -218,7 +221,8 @@ def stream_response_raw(url: str, provider, payload: dict, use_mock: bool = Fals
 
 
 def stream_response_block(url: str, provider, payload: dict, use_mock: bool = False,
-                         mock_file: Optional[str] = None, timeout: float = 60.0,
+                         mock_file: Optional[str] = None, mock_delay: Optional[int] = None,
+                         timeout: float = 60.0,
                          live_window: int = 6) -> Optional[str]:
     """Stream response with block-buffered Markdown rendering (--block mode)."""
     global _abort
@@ -226,12 +230,9 @@ def stream_response_block(url: str, provider, payload: dict, use_mock: bool = Fa
 
     try:
         if use_mock:
-            params = {}
-            if mock_file:
-                params["file"] = mock_file
-            response = requests.get(url, params=params or None, stream=True, timeout=timeout)
-        else:
-            response = requests.post(url, json=payload, stream=True, timeout=timeout)
+            payload = build_mock_payload(mock_file, mock_delay) or {}
+
+        response = requests.post(url, json=payload, stream=True, timeout=timeout)
 
         with response:
             if not response.ok:
@@ -295,47 +296,36 @@ def stream_response_block(url: str, provider, payload: dict, use_mock: bool = Fa
 
 
 def stream_response_live(url: str, provider, payload: dict, use_mock: bool = False,
-                        mock_file: Optional[str] = None, timeout: float = 60.0,
+                        mock_file: Optional[str] = None, mock_delay: Optional[int] = None,
+                        timeout: float = 60.0,
                         live_window: int = 6) -> int:
     """Stream response with live rendering using StreamingClient (--live mode)."""
     console.print(f"[dim]Testing live rendering with StreamingClient...[/dim]")
-    
+
     try:
         # Create StreamingClient
         client = StreamingClient()
-        
+
         # Handle mock mode - use same pattern as other debug functions
         if use_mock:
-            # For mock mode, we need to adjust URL and make GET request
-            mock_url = url.replace("/invoke", "/mock")
-            params = {}
-            if mock_file:
-                params["file"] = mock_file
-            
-            # For mock mode, we need to build the URL with query params
-            if params:
-                from urllib.parse import urlencode
-                mock_url = f"{mock_url}?{urlencode(params)}"
-            
-            # Use mock URL and empty payload for GET request
-            url = mock_url
-            payload = {}
-        
-        # Unfortunately, StreamingClient.stream_with_live_rendering doesn't support GET method
-        # For mock mode, let's use the lower-level approach
-        if use_mock:
-            # Use the iter_sse_lines method directly for GET requests
+            # Use the iter_sse_lines method directly for POST requests
             result_text = []
             model_name = None
-            
+
             console.rule("[bold cyan]Mock Live Rendering Test")
-            
+
             from render.markdown_live import MarkdownStream
             ms = MarkdownStream(live_window=live_window)
             ms.start_waiting("Loading mock data...")
-            
+
             try:
-                for line in client.iter_sse_lines(url, method="GET"):
+                mock_payload = build_mock_payload(mock_file, mock_delay)
+                for line in client.iter_sse_lines(
+                    url,
+                    method="POST",
+                    json=mock_payload or {},
+                    timeout=timeout,
+                ):
                     ms.stop_waiting()
                     for kind, value in provider.map_events([line]):
                         if kind == "model":
@@ -347,11 +337,11 @@ def stream_response_live(url: str, provider, payload: dict, use_mock: bool = Fal
                             ms.add_response(value or "")
                         elif kind == "done":
                             break
-                    
+
                 ms.update("".join(result_text), final=True)
                 console.print(f"\n[dim]Mock streaming completed successfully[/dim]")
                 return 0
-                
+
             except Exception as e:
                 ms.stop_waiting()
                 console.print(f"[red]Mock streaming error: {e}[/red]")
@@ -368,7 +358,7 @@ def stream_response_live(url: str, provider, payload: dict, use_mock: bool = Fal
                 show_model_name=True,
                 live_window=live_window
             )
-            
+
             # Print final results for real endpoints
             if result.aborted:
                 console.print(f"\n[dim]Stream aborted[/dim]")
@@ -378,9 +368,9 @@ def stream_response_live(url: str, provider, payload: dict, use_mock: bool = Fal
                 console.print(f"\n[dim]Final: {result.tokens} tokens, cost ${result.cost:.4f}[/dim]")
                 if result.tool_calls:
                     console.print(f"[dim]Tools used: {len(result.tool_calls)}[/dim]")
-            
+
             return 0
-        
+
     except RequestException as e:
         console.print(f"[red]Network error[/red]: {e}")
         return 1
@@ -390,7 +380,8 @@ def stream_response_live(url: str, provider, payload: dict, use_mock: bool = Fal
 
 
 def interactive_mode(url: str, provider, model: Optional[str], use_mock: bool = False,
-                    mock_file: Optional[str] = None, timeout: float = 60.0,
+                    mock_file: Optional[str] = None, mock_delay: Optional[int] = None,
+                    timeout: float = 60.0,
                     live_window: int = 6) -> None:
     """Interactive mode with block-buffered Markdown rendering."""
     console.rule("LLM Debug CLI • Interactive Mode")
@@ -414,7 +405,16 @@ def interactive_mode(url: str, provider, model: Optional[str], use_mock: bool = 
             return
 
         payload = build_payload(provider, user_input, model=model)
-        stream_response_block(url, provider, payload, use_mock, mock_file, timeout, live_window)
+        stream_response_block(
+            url,
+            provider,
+            payload,
+            use_mock,
+            mock_file,
+            mock_delay,
+            timeout,
+            live_window,
+        )
 
 
 def to_mock_url(url: str) -> str:
@@ -470,8 +470,16 @@ def main(argv: list[str] | None = None) -> int:
 
     # Handle interactive mode
     if args.interactive:
-        interactive_mode(url, provider, args.model, args.mock, args.mock_file,
-                        args.timeout, args.live_window)
+        interactive_mode(
+            url,
+            provider,
+            args.model,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+            args.live_window,
+        )
         return 0
 
     # Handle non-interactive modes
@@ -484,19 +492,59 @@ def main(argv: list[str] | None = None) -> int:
 
     # Route to appropriate output handler
     if args.http:
-        return stream_response_http(url, provider, payload, args.mock, args.mock_file, args.timeout)
+        return stream_response_http(
+            url,
+            provider,
+            payload,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+        )
     elif args.raw:
-        return stream_response_raw(url, provider, payload, args.mock, args.mock_file, args.timeout)
+        return stream_response_raw(
+            url,
+            provider,
+            payload,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+        )
     elif args.block:
-        stream_response_block(url, provider, payload, args.mock, args.mock_file,
-                            args.timeout, args.live_window)
+        stream_response_block(
+            url,
+            provider,
+            payload,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+            args.live_window,
+        )
         return 0
     elif args.live:
-        return stream_response_live(url, provider, payload, args.mock, args.mock_file,
-                                  args.timeout, args.live_window)
+        return stream_response_live(
+            url,
+            provider,
+            payload,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+            args.live_window,
+        )
     else:
         # Default to raw mode if no mode specified
-        return stream_response_raw(url, provider, payload, args.mock, args.mock_file, args.timeout)
+        return stream_response_raw(
+            url,
+            provider,
+            payload,
+            args.mock,
+            args.mock_file,
+            args.mock_delay,
+            args.timeout,
+        )
 
 
 if __name__ == "__main__":

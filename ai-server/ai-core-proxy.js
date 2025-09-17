@@ -18,12 +18,40 @@ console.log(LLM_API_ENDPOINT);
 
 const app = express();
 
-app.get("/mock", async (req, res) => {
-  const filePath = req.query.file || "mock.dat";
-  const delayMs = Math.max(
-    0,
-    Number(req.query.delay_ms ?? req.query.delay ?? 0) || 0,
-  );
+app.post("/mock", async (req, res) => {
+  let params = {};
+  try {
+    const bodyBuf = await readBody(req);
+    if (bodyBuf && bodyBuf.length) {
+      params = JSON.parse(bodyBuf.toString("utf8"));
+    }
+  } catch (e) {
+    return res
+      .status(400)
+      .json({ error: "mock_invalid_body", message: e?.message || String(e) });
+  }
+
+  const pickString = (value) => {
+    if (Array.isArray(value)) {
+      return value.length ? String(value[0]) : undefined;
+    }
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  };
+
+  const pickDelay = (value) => {
+    if (Array.isArray(value)) value = value[0];
+    if (value === undefined || value === null || value === "") return undefined;
+    const num = Number(value);
+    return Number.isFinite(num) ? Math.max(0, num) : undefined;
+  };
+
+  const filePath =
+    pickString(params.file) || pickString(req.query?.file) || "mock.dat";
+  const delayMs =
+    pickDelay(params.delay_ms ?? params.delay) ??
+    pickDelay(req.query?.delay_ms ?? req.query?.delay) ??
+    pickDelay(process.env.LLM_MOCK_DELAY_MS) ??
+    0;
 
   // Random jitter between 20 and 100 ms
   const jitter = () => 20 + Math.floor(Math.random() * (100 - 50 + 1));
