@@ -1,10 +1,10 @@
 {
   "name": "llm",
   "version": "1.0.0",
-  "main": "ai-core-proxy.js",
+  "main": "ai-core-proxy.ts",
   "scripts": {
-    "start": "node ai-core-proxy.js",
-    "dev": "NODE_ENV=development node ai-core-proxy.js",
+    "start": "node ai-core-proxy.ts",
+    "dev": "NODE_ENV=development node ai-core-proxy.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,5 +15,10 @@
   "dependencies": {
     "dotenv": "^17.2.1",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.5.1",
+    "typescript": "^5.9.2"
   }
 }

@@ -1,9 +1,18 @@
-// Node 18+ (uses built-in fetch). Save as ai-core-proxy.js
+// Node 22+ with native TypeScript support
 import "dotenv/config";
-import express from "express";
+import express, { type Request, type Response } from "express";
 import { Readable } from "stream";
 import { Buffer } from "buffer";
 import { promises as fs } from "node:fs";
+
+interface EnvConfig {
+  OAUTH_TOKEN_URL: string;
+  OAUTH_CLIENT_ID: string;
+  OAUTH_CLIENT_SECRET: string;
+  LLM_API_ENDPOINT: string;
+  HOST: string;
+  PORT: string;
+}
 
 const {
   OAUTH_TOKEN_URL,
@@ -12,33 +21,40 @@ const {
   LLM_API_ENDPOINT,
   HOST = "127.0.0.1",
   PORT = "8000",
-} = process.env;
+} = process.env as EnvConfig;
 
 console.log(LLM_API_ENDPOINT);
 
 const app = express();
 
-app.post("/mock", async (req, res) => {
-  let params = {};
+interface MockParams {
+  file?: string;
+  delay_ms?: number | string;
+  delay?: number | string;
+}
+
+app.post("/mock", async (req: Request, res: Response) => {
+  let params: MockParams = {};
   try {
     const bodyBuf = await readBody(req);
     if (bodyBuf && bodyBuf.length) {
       params = JSON.parse(bodyBuf.toString("utf8"));
     }
-  } catch (e) {
+  } catch (e: unknown) {
+    const error = e as Error;
     return res
       .status(400)
-      .json({ error: "mock_invalid_body", message: e?.message || String(e) });
+      .json({ error: "mock_invalid_body", message: error?.message || String(e) });
   }
 
-  const pickString = (value) => {
+  const pickString = (value: unknown): string | undefined => {
     if (Array.isArray(value)) {
       return value.length ? String(value[0]) : undefined;
     }
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
   };
 
-  const pickDelay = (value) => {
+  const pickDelay = (value: unknown): number | undefined => {
     if (Array.isArray(value)) value = value[0];
     if (value === undefined || value === null || value === "") return undefined;
     const num = Number(value);
@@ -65,12 +81,13 @@ app.post("/mock", async (req, res) => {
   let body;
   try {
     body = await fs.readFile(filePath, "utf8");
-  } catch (e) {
+  } catch (e: unknown) {
+    const error = e as Error;
     res.status(404);
     res.write(
       `data: ${JSON.stringify({
         error: "mock_file_not_found",
-        message: e?.message || String(e),
+        message: error?.message || String(e),
         file: filePath,
       })}\n\n`,
     );
@@ -101,16 +118,22 @@ app.post("/mock", async (req, res) => {
 });
 
 // ---- tiny raw-body helper (no body-parser needed)
-async function readBody(req) {
-  const chunks = [];
+async function readBody(req: Request): Promise<Buffer | null> {
+  const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c);
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
 // --- token cache
-let token = null;
-let tokenExp = 0;
-async function getToken() {
+interface TokenResponse {
+  access_token: string;
+  expires_in?: number;
+}
+
+let token: string | null = null;
+let tokenExp: number = 0;
+
+async function getToken(): Promise<string> {
   if (token && Date.now() < tokenExp - 30_000) {
     console.log("Using cached access token");
     return token;
@@ -133,7 +156,7 @@ async function getToken() {
     const text = await resp.text().catch(() => "");
     throw new Error(`Token request failed (${resp.status}): ${text}`);
   }
-  const data = await resp.json();
+  const data = await resp.json() as TokenResponse;
   token = data.access_token;
   const ttl = Number(data.expires_in ?? 300);
   tokenExp = Date.now() + ttl * 1000;
@@ -142,7 +165,7 @@ async function getToken() {
 }
 
 // === SINGLE ENDPOINT ===
-app.post("/invoke", async (req, res) => {
+app.post("/invoke", async (req: Request, res: Response) => {
   try {
     const access = await getToken();
     const bodyBuf = await readBody(req);
@@ -154,7 +177,7 @@ app.post("/invoke", async (req, res) => {
         console.log("==== Received Request ====");
         console.log(JSON.stringify(requestData, null, 2));
         console.log("=======================");
-      } catch (e) {
+      } catch (e: unknown) {
         console.log("==== Raw Request Body ====");
         console.log(bodyBuf.toString());
         console.log("=======================");
@@ -197,17 +220,18 @@ app.post("/invoke", async (req, res) => {
     });
     console.log("==========================");
 
-    nodeStream.on("error", (e) => {
+    nodeStream.on("error", (e: Error) => {
       if (!res.headersSent) res.status(502);
       try {
         res.end(`\n[proxy stream error] ${e?.message || e}`);
       } catch {}
     });
     nodeStream.pipe(res);
-  } catch (e) {
+  } catch (e: unknown) {
+    const error = e as Error;
     res
       .status(500)
-      .json({ error: "proxy_error", message: e?.message || String(e) });
+      .json({ error: "proxy_error", message: error?.message || String(e) });
   }
 });
 
