@@ -19,6 +19,7 @@ Notes
 from __future__ import annotations
 
 import argparse
+import shutil
 import signal
 from typing import List, Optional
 from rich.console import Console
@@ -46,7 +47,34 @@ DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_MODEL = "cyan"
 PROMPT_STYLE = "bold green"
 
-console = Console(soft_wrap=True)
+# Detect terminal width with smart fallback
+def get_terminal_width():
+    """Get terminal width with intelligent fallback."""
+    try:
+        # Try shutil first
+        term_size = shutil.get_terminal_size()
+        width = term_size.columns
+
+        # If detection returns default (80) or very small, use reasonable fallback
+        if width <= 80:
+            # Try environment variables
+            import os
+            env_cols = os.environ.get('COLUMNS')
+            if env_cols and env_cols.isdigit():
+                width = int(env_cols)
+            else:
+                # Fallback to reasonable width for modern terminals
+                width = 120
+
+        # Be much more conservative to account for font rendering differences
+        # Reduce by 25% to provide larger buffer for visual vs character width mismatches
+        width = int(width * 0.75)
+
+        return max(width, 100)  # Ensure minimum reasonable width
+    except Exception:
+        return 120  # Safe fallback
+
+console = Console(soft_wrap=True, force_terminal=True, width=get_terminal_width())
 _ABORT = False
 
 # ---------------- Client core ----------------
@@ -133,7 +161,7 @@ def handle_streaming_request(
         use_thinking=use_thinking,
         provider_name=session.provider_name,
         show_model_name=show_model_name,
-        live_window=6
+        live_window=12
     )
 
 # ---------------- Tool Result Handling ----------------
@@ -224,7 +252,7 @@ def repl(
         url=url,
         provider=provider,
         max_tokens=4096,  # Default max tokens
-        timeout=60.0,  # Default timeout
+        timeout=120.0,  # Default timeout
         tool_executor=tool_executor,
         context_manager=context_manager,
         rag_manager=rag_manager,
