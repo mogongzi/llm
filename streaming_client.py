@@ -250,8 +250,8 @@ class StreamingClient:
         live_window: int = 6
     ) -> StreamResult:
         """Stream response with live Markdown rendering and tool execution."""
-        # Create markdown stream for live rendering
-        ms = MarkdownStream(live_window=live_window)
+        # Create markdown stream for live rendering (pass console for width-aware wrapping)
+        ms = MarkdownStream(live_window=live_window, console_ref=console)
 
         # Set up abort handling
         global _ABORT
@@ -293,6 +293,8 @@ class StreamingClient:
                         ms.stop_waiting()
                         text_buffer.append(event.value or "")
                         ms.add_response(event.value or "")
+
+
 
                     elif event.kind == "tool_start":
                         ms.stop_waiting()

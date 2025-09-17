@@ -21,6 +21,7 @@ import os
 import argparse
 import json
 import select
+import shutil
 import termios
 import tty
 import threading
@@ -45,7 +46,34 @@ DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_PROMPT = "bold green"
 COLOR_MODEL = "cyan"
 
-console = Console(soft_wrap=True)
+# Detect terminal width with smart fallback
+def get_terminal_width():
+    """Get terminal width with intelligent fallback."""
+    try:
+        # Try shutil first
+        term_size = shutil.get_terminal_size()
+        width = term_size.columns
+
+        # If detection returns default (80) or very small, use reasonable fallback
+        if width <= 80:
+            # Try environment variables
+            import os
+            env_cols = os.environ.get('COLUMNS')
+            if env_cols and env_cols.isdigit():
+                width = int(env_cols)
+            else:
+                # Fallback to reasonable width for modern terminals
+                width = 120
+
+        # Be much more conservative to account for font rendering differences
+        # Reduce by 25% to provide larger buffer for visual vs character width mismatches
+        width = int(width * 0.75)
+
+        return max(width, 100)  # Ensure minimum reasonable width
+    except Exception:
+        return 120  # Safe fallback
+
+console = Console(soft_wrap=True, force_terminal=True, width=get_terminal_width())
 _abort = False
 
 
@@ -306,70 +334,34 @@ def stream_response_live(url: str, provider, payload: dict, use_mock: bool = Fal
         # Create StreamingClient
         client = StreamingClient()
 
-        # Handle mock mode - use same pattern as other debug functions
-        if use_mock:
-            # Use the iter_sse_lines method directly for POST requests
-            result_text = []
-            model_name = None
+        # Exact parity with llm-cli: always use StreamingClient.stream_with_live_rendering
+        # The only difference in mock mode is the payload content and the URL (/mock).
+        effective_payload = (
+            build_mock_payload(mock_file, mock_delay) if use_mock else payload
+        ) or {}
 
-            console.rule("[bold cyan]Mock Live Rendering Test")
+        result = client.stream_with_live_rendering(
+            url=url,
+            payload=effective_payload,
+            mapper=provider.map_events,
+            console=console,
+            use_thinking=False,
+            provider_name=provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock",
+            show_model_name=True,
+            live_window=live_window,
+        )
 
-            from render.markdown_live import MarkdownStream
-            ms = MarkdownStream(live_window=live_window)
-            ms.start_waiting("Loading mock data...")
-
-            try:
-                mock_payload = build_mock_payload(mock_file, mock_delay)
-                for line in client.iter_sse_lines(
-                    url,
-                    method="POST",
-                    json=mock_payload or {},
-                    timeout=timeout,
-                ):
-                    ms.stop_waiting()
-                    for kind, value in provider.map_events([line]):
-                        if kind == "model":
-                            model_name = value
-                            if model_name:
-                                console.rule(f"[bold cyan]{model_name}")
-                        elif kind == "text":
-                            result_text.append(value or "")
-                            ms.add_response(value or "")
-                        elif kind == "done":
-                            break
-
-                ms.update("".join(result_text), final=True)
-                console.print(f"\n[dim]Mock streaming completed successfully[/dim]")
-                return 0
-
-            except Exception as e:
-                ms.stop_waiting()
-                console.print(f"[red]Mock streaming error: {e}[/red]")
-                return 1
+        # Unified final result reporting
+        if result.aborted:
+            console.print(f"\n[dim]Stream aborted[/dim]")
+        elif result.error:
+            console.print(f"\n[red]Error: {result.error}[/red]")
         else:
-            # Use live rendering method for real endpoints
-            result = client.stream_with_live_rendering(
-                url=url,
-                payload=payload,
-                mapper=provider.map_events,
-                console=console,
-                use_thinking=False,
-                provider_name=provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock",
-                show_model_name=True,
-                live_window=live_window
-            )
+            console.print(f"\n[dim]Final: {result.tokens} tokens, cost ${result.cost:.4f}[/dim]")
+            if result.tool_calls:
+                console.print(f"[dim]Tools used: {len(result.tool_calls)}[/dim]")
 
-            # Print final results for real endpoints
-            if result.aborted:
-                console.print(f"\n[dim]Stream aborted[/dim]")
-            elif result.error:
-                console.print(f"\n[red]Error: {result.error}[/red]")
-            else:
-                console.print(f"\n[dim]Final: {result.tokens} tokens, cost ${result.cost:.4f}[/dim]")
-                if result.tool_calls:
-                    console.print(f"[dim]Tools used: {len(result.tool_calls)}[/dim]")
-
-            return 0
+        return 0
 
     except RequestException as e:
         console.print(f"[red]Network error[/red]: {e}")
