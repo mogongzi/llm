@@ -251,7 +251,7 @@ class StreamingClient:
     ) -> StreamResult:
         """Stream response with live Markdown rendering and tool execution."""
         # Create markdown stream for live rendering (pass console for width-aware wrapping)
-        ms = MarkdownStream(live_window=live_window, console_ref=console)
+        ms = MarkdownStream(live_window=live_window)
 
         # Set up abort handling
         global _ABORT
