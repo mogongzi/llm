@@ -5,7 +5,7 @@ from rich.console import Console
 
 from streaming_client import StreamingClient, StreamResult
 
-console = Console(soft_wrap=True, force_terminal=True)
+console = Console(soft_wrap=True)
 
 
 class ChatSession:

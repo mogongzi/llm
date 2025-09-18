@@ -21,7 +21,6 @@ import os
 import argparse
 import json
 import select
-import shutil
 import termios
 import tty
 import threading
@@ -46,34 +45,7 @@ DEFAULT_URL = "http://127.0.0.1:8000/invoke"
 COLOR_PROMPT = "bold green"
 COLOR_MODEL = "cyan"
 
-# Detect terminal width with smart fallback
-def get_terminal_width():
-    """Get terminal width with intelligent fallback."""
-    try:
-        # Try shutil first
-        term_size = shutil.get_terminal_size()
-        width = term_size.columns
-
-        # If detection returns default (80) or very small, use reasonable fallback
-        if width <= 80:
-            # Try environment variables
-            import os
-            env_cols = os.environ.get('COLUMNS')
-            if env_cols and env_cols.isdigit():
-                width = int(env_cols)
-            else:
-                # Fallback to reasonable width for modern terminals
-                width = 120
-
-        # Be much more conservative to account for font rendering differences
-        # Reduce by 25% to provide larger buffer for visual vs character width mismatches
-        width = int(width * 0.75)
-
-        return max(width, 100)  # Ensure minimum reasonable width
-    except Exception:
-        return 120  # Safe fallback
-
-console = Console(soft_wrap=True, force_terminal=True, width=get_terminal_width())
+console = Console()
 _abort = False
 
 
