@@ -27,22 +27,22 @@ def test_conversation_manager_initialization():
 def test_add_user_message():
     """Test adding user messages to conversation."""
     manager = ConversationManager()
-    
+
     manager.add_user_message("Hello, how are you?")
     assert len(manager.history) == 1
     assert manager.history[0]["role"] == "user"
     assert manager.history[0]["content"] == "Hello, how are you?"
-    
-    manager.add_user_message("What is 2+2?")
+
+    manager.add_user_message("What time is it?")
     assert len(manager.history) == 2
     assert manager.history[1]["role"] == "user"
-    assert manager.history[1]["content"] == "What is 2+2?"
+    assert manager.history[1]["content"] == "What time is it?"
 
 
 def test_add_assistant_message():
     """Test adding assistant messages to conversation."""
     manager = ConversationManager()
-    
+
     manager.add_assistant_message("Hello! I'm doing well, thank you.")
     assert len(manager.history) == 1
     assert manager.history[0]["role"] == "assistant"
@@ -52,14 +52,14 @@ def test_add_assistant_message():
 def test_add_assistant_message_empty():
     """Test that empty assistant messages are filtered out."""
     manager = ConversationManager()
-    
+
     # These should be filtered out
     manager.add_assistant_message("")
     manager.add_assistant_message("   ")
     manager.add_assistant_message("\t\n  ")
-    
+
     assert len(manager.history) == 0
-    
+
     # This should be added
     manager.add_assistant_message("Valid response")
     assert len(manager.history) == 1
@@ -69,7 +69,7 @@ def test_add_assistant_message_empty():
 def test_add_tool_messages():
     """Test adding tool messages to conversation."""
     manager = ConversationManager()
-    
+
     tool_messages = [
         {
             "role": "assistant",
@@ -77,8 +77,8 @@ def test_add_tool_messages():
                 {
                     "type": "tool_use",
                     "id": "toolu_123",
-                    "name": "calculate",
-                    "input": {"expression": "2 + 2"}
+                    "name": "get_current_time",
+                    "input": {"timezone": "UTC"}
                 }
             ]
         },
@@ -88,27 +88,27 @@ def test_add_tool_messages():
                 {
                     "type": "tool_result",
                     "tool_use_id": "toolu_123",
-                    "content": "4"
+                    "content": "2024-01-01 12:00:00"
                 }
             ]
         }
     ]
-    
+
     manager.add_tool_messages(tool_messages)
     assert len(manager.history) == 2
     assert manager.history[0]["role"] == "assistant"
     assert manager.history[1]["role"] == "user"
-    assert manager.history[1]["content"][0]["content"] == "4"
+    assert manager.history[1]["content"][0]["content"] == "2024-01-01 12:00:00"
 
 
 def test_clear_history():
     """Test clearing conversation history."""
     manager = ConversationManager()
-    
+
     manager.add_user_message("Test message")
     manager.add_assistant_message("Test response")
     assert len(manager.history) == 2
-    
+
     manager.clear_history()
     assert len(manager.history) == 0
     assert manager.history == []
@@ -117,22 +117,22 @@ def test_clear_history():
 def test_get_sanitized_history():
     """Test getting sanitized conversation history."""
     manager = ConversationManager()
-    
+
     # Add valid messages
     manager.add_user_message("Hello")
     manager.add_assistant_message("Hi there!")
-    
+
     # Add messages that should be filtered
     manager.history.append({"role": "assistant", "content": ""})
     manager.history.append({"role": "assistant", "content": "   "})
     manager.history.append({"role": "assistant", "content": []})
-    
+
     # Add another valid message
     manager.add_user_message("How are you?")
     manager.add_assistant_message("I'm good!")
-    
+
     sanitized = manager.get_sanitized_history()
-    
+
     assert len(sanitized) == 4  # Only valid messages
     assert sanitized[0]["role"] == "user"
     assert sanitized[0]["content"] == "Hello"
@@ -147,10 +147,10 @@ def test_get_sanitized_history():
 def test_get_sanitized_history_tool_messages():
     """Test sanitized history with tool messages."""
     manager = ConversationManager()
-    
+
     # Add normal message
-    manager.add_user_message("Calculate 2+2")
-    
+    manager.add_user_message("What time is it?")
+
     # Add tool messages
     manager.history.append({
         "role": "assistant",
@@ -158,18 +158,18 @@ def test_get_sanitized_history_tool_messages():
             {
                 "type": "tool_use",
                 "id": "toolu_123",
-                "name": "calculate",
-                "input": {"expression": "2 + 2"}
+                "name": "get_current_time",
+                "input": {"timezone": "UTC"}
             }
         ]
     })
-    
+
     # Add empty tool message (should be filtered)
     manager.history.append({
         "role": "assistant",
         "content": []
     })
-    
+
     # Add tool result
     manager.history.append({
         "role": "user",
@@ -177,13 +177,13 @@ def test_get_sanitized_history_tool_messages():
             {
                 "type": "tool_result",
                 "tool_use_id": "toolu_123",
-                "content": "4"
+                "content": "2024-01-01 12:00:00"
             }
         ]
     })
-    
+
     sanitized = manager.get_sanitized_history()
-    
+
     assert len(sanitized) == 3  # User message, tool use, tool result
     assert sanitized[0]["role"] == "user"
     assert sanitized[1]["role"] == "assistant"
@@ -194,13 +194,13 @@ def test_get_sanitized_history_tool_messages():
 def test_get_user_history():
     """Test extracting user message history."""
     manager = ConversationManager()
-    
+
     manager.add_user_message("First message")
     manager.add_assistant_message("Response 1")
     manager.add_user_message("Second message")
     manager.add_assistant_message("Response 2")
     manager.add_user_message("Third message")
-    
+
     # Add tool message (should not be included)
     manager.history.append({
         "role": "user",
@@ -212,9 +212,9 @@ def test_get_user_history():
             }
         ]
     })
-    
+
     user_history = manager.get_user_history()
-    
+
     expected = ["First message", "Second message", "Third message"]
     assert user_history == expected
 
@@ -222,14 +222,14 @@ def test_get_user_history():
 def test_complex_conversation_flow():
     """Test a complex conversation with mixed message types."""
     manager = ConversationManager()
-    
+
     # User starts conversation
     manager.add_user_message("Hello, can you help me with math?")
     manager.add_assistant_message("Of course! What math problem do you need help with?")
-    
+
     # User asks for calculation
-    manager.add_user_message("What's the square root of 16?")
-    
+    manager.add_user_message("What's the time in UTC?")
+
     # Tool calling flow
     tool_messages = [
         {
@@ -238,8 +238,8 @@ def test_complex_conversation_flow():
                 {
                     "type": "tool_use",
                     "id": "toolu_456",
-                    "name": "calculate",
-                    "input": {"expression": "sqrt(16)"}
+                    "name": "get_current_time",
+                    "input": {"timezone": "UTC"}
                 }
             ]
         },
@@ -249,36 +249,36 @@ def test_complex_conversation_flow():
                 {
                     "type": "tool_result",
                     "tool_use_id": "toolu_456",
-                    "content": "4"
+                    "content": "2024-01-01 12:00:00"
                 }
             ]
         }
     ]
     manager.add_tool_messages(tool_messages)
-    
+
     # Assistant responds with result
-    manager.add_assistant_message("The square root of 16 is 4.")
-    
+    manager.add_assistant_message("Time in UTC is 2024-01-01 12:00:00.")
+
     # User thanks
     manager.add_user_message("Thank you!")
     manager.add_assistant_message("You're welcome!")
-    
+
     # Test final state
     assert len(manager.history) == 8
-    
+
     # Test sanitized history
     sanitized = manager.get_sanitized_history()
     assert len(sanitized) == 8
-    
+
     # Test user history
     user_history = manager.get_user_history()
     expected_user_messages = [
         "Hello, can you help me with math?",
-        "What's the square root of 16?",
+        "What's the time in UTC?",
         "Thank you!"
     ]
     assert user_history == expected_user_messages
-    
+
     # Verify conversation alternation
     roles = [msg["role"] for msg in sanitized]
     expected_roles = ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]
@@ -288,10 +288,10 @@ def test_complex_conversation_flow():
 def test_empty_conversation():
     """Test operations on empty conversation."""
     manager = ConversationManager()
-    
+
     assert manager.get_sanitized_history() == []
     assert manager.get_user_history() == []
-    
+
     # Clear empty history should work
     manager.clear_history()
     assert manager.history == []
@@ -300,15 +300,15 @@ def test_empty_conversation():
 def test_conversation_with_only_empty_messages():
     """Test conversation that only contains messages that get filtered."""
     manager = ConversationManager()
-    
+
     # Add only empty/whitespace assistant messages
     manager.history.append({"role": "assistant", "content": ""})
     manager.history.append({"role": "assistant", "content": "   "})
     manager.history.append({"role": "assistant", "content": []})
-    
+
     sanitized = manager.get_sanitized_history()
     assert sanitized == []
-    
+
     user_history = manager.get_user_history()
     assert user_history == []
 

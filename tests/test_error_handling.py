@@ -35,68 +35,7 @@ class TestToolExecutorErrors:
         assert "Unknown tool" in result["error"]
         assert "not available" in result["content"]
 
-    def test_calculator_invalid_expression(self):
-        """Test calculator with invalid expressions."""
-        executor = ToolExecutor()
-
-        # Test invalid characters
-        result = executor.execute_tool("calculate", {"expression": "eval('malicious')"})
-        assert "error" in result
-        assert "Invalid characters" in result["error"]
-
-        # Test division by zero
-        result = executor.execute_tool("calculate", {"expression": "1/0"})
-        assert "error" in result
-        assert "division by zero" in result["error"].lower()
-
-        # Test undefined variable (should be caught by safe character check)
-        result = executor.execute_tool("calculate", {"expression": "unknown_var + 1"})
-        # This might pass safe chars but fail in evaluation, either case is acceptable
-        if "error" in result:
-            assert len(result["error"]) > 0
-
-    def test_calculator_missing_expression(self):
-        """Test calculator without expression parameter."""
-        executor = ToolExecutor()
-
-        result = executor.execute_tool("calculate", {})
-        assert "error" in result
-        assert "Expression is required" == result["error"]
-        assert "expression" in result["content"].lower()
-
-    def test_weather_no_api_key(self):
-        """Test weather tool without API key."""
-        executor = ToolExecutor()
-
-        with patch.dict(os.environ, {}, clear=True):
-            result = executor.execute_tool("get_weather", {"location": "Paris"})
-            assert "error" in result
-            assert "Weather API key not configured" == result["error"]
-            assert "OPENWEATHER_API_KEY" in result["content"]
-
-    def test_weather_missing_location(self):
-        """Test weather tool without location parameter."""
-        executor = ToolExecutor()
-
-        result = executor.execute_tool("get_weather", {})
-        assert "error" in result
-        assert "Location is required" == result["error"]
-        assert "location" in result["content"].lower()
-
-    @patch('requests.get')
-    def test_weather_api_error(self, mock_get):
-        """Test weather tool with API error."""
-        # Create executor with API key to bypass the key check
-        executor = ToolExecutor(weather_api_key="test_key")
-
-        # Mock API error response
-        mock_response = Mock()
-        mock_response.raise_for_status.side_effect = Exception("HTTP 500")
-        mock_get.return_value = mock_response
-
-        result = executor.execute_tool("get_weather", {"location": "InvalidCity"})
-        assert "error" in result
-        assert "Weather lookup failed" in result["error"]
+    # Removed calculator and weather tool tests (tools no longer defined)
 
     def test_time_invalid_timezone(self):
         """Test time tool with invalid timezone."""
@@ -351,11 +290,7 @@ def test_all_error_scenarios():
     print("Testing tool executor errors...")
     executor_tests = TestToolExecutorErrors()
     executor_tests.test_unknown_tool_execution()
-    executor_tests.test_calculator_invalid_expression()
-    executor_tests.test_calculator_missing_expression()
-    executor_tests.test_weather_no_api_key()
-    executor_tests.test_weather_missing_location()
-    # Skip weather_api_error in manual test as it requires mocking
+    # Calculator and weather tools removed; corresponding tests skipped
     executor_tests.test_time_invalid_timezone()
     executor_tests.test_time_invalid_format()
 

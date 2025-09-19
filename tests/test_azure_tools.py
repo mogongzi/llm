@@ -5,17 +5,15 @@ def test_build_openai_tools():
     """Test building OpenAI tools from abstract tool definitions."""
     abstract_tools = [
         {
-            "name": "calculate",
-            "description": "Perform mathematical calculations",
+            "name": "get_current_time",
+            "description": "Get current date/time",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "Mathematical expression to evaluate"
-                    }
+                    "timezone": {"type": "string"},
+                    "format": {"type": "string", "enum": ["iso", "human", "unix"]}
                 },
-                "required": ["expression"]
+                "required": []
             }
         }
     ]
@@ -26,17 +24,15 @@ def test_build_openai_tools():
         {
             "type": "function",
             "function": {
-                "name": "calculate",
-                "description": "Perform mathematical calculations",
+                "name": "get_current_time",
+                "description": "Get current date/time",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "expression": {
-                            "type": "string",
-                            "description": "Mathematical expression to evaluate"
-                        }
+                        "timezone": {"type": "string"},
+                        "format": {"type": "string", "enum": ["iso", "human", "unix"]}
                     },
-                    "required": ["expression"]
+                    "required": []
                 }
             }
         }
@@ -47,15 +43,15 @@ def test_build_openai_tools():
 
 def test_azure_build_payload_with_tools():
     """Test Azure payload building with tools."""
-    messages = [{"role": "user", "content": "Calculate 2+2"}]
+    messages = [{"role": "user", "content": "What time is it?"}]
     tools = [
         {
-            "name": "calculate",
-            "description": "Perform calculations",
+            "name": "get_current_time",
+            "description": "Get current time",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "expression": {"type": "string"}
+                    "timezone": {"type": "string"}
                 }
             }
         }
@@ -67,7 +63,7 @@ def test_azure_build_payload_with_tools():
     assert "tools" in payload
     assert len(payload["tools"]) == 1
     assert payload["tools"][0]["type"] == "function"
-    assert payload["tools"][0]["function"]["name"] == "calculate"
+    assert payload["tools"][0]["function"]["name"] == "get_current_time"
     assert payload["tools"][0]["function"]["parameters"]["type"] == "object"
 
 
@@ -76,9 +72,9 @@ def test_azure_tool_events_mapping():
     # Simulate OpenAI streaming response with tool calls
     sse_lines = [
         '{"choices":[{"delta":{"role":"assistant"},"index":0}]}',
-        '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"calculate","arguments":""}}]},"index":0}]}',
-        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"expression\\""}}]},"index":0}]}',
-        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":": \\"2+2\\"}"}}]},"index":0}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"get_current_time","arguments":""}}]},"index":0}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"timezone\\""}}]},"index":0}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" : \\"UTC\\"}"}}]},"index":0}]}',
         '{"choices":[{"finish_reason":"tool_calls","index":0}]}'
     ]
     
@@ -96,7 +92,7 @@ def test_azure_tool_events_mapping():
     import json
     tool_info = json.loads(tool_start_event[1])
     assert tool_info["id"] == "call_123"
-    assert tool_info["name"] == "calculate"
+    assert tool_info["name"] == "get_current_time"
 
 
 if __name__ == "__main__":

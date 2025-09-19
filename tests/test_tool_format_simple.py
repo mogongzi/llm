@@ -55,10 +55,10 @@ def test_tool_message_formatting():
         {
             "tool_call": {
                 "id": "toolu_123",
-                "name": "calculate", 
-                "input": {"expression": "2 + 2"}
+                "name": "get_current_time", 
+                "input": {"timezone": "UTC", "format": "iso"}
             },
-            "result": "2 + 2 = 4"
+            "result": "2024-01-01T12:00:00Z"
         }
     ]
     
@@ -76,8 +76,8 @@ def test_tool_message_formatting():
     tool_use = assistant_msg["content"][0]
     assert tool_use["type"] == "tool_use"
     assert tool_use["id"] == "toolu_123"
-    assert tool_use["name"] == "calculate"
-    assert tool_use["input"] == {"expression": "2 + 2"}
+    assert tool_use["name"] == "get_current_time"
+    assert tool_use["input"] == {"timezone": "UTC", "format": "iso"}
     
     # Check user message structure
     user_msg = messages[1]
@@ -88,7 +88,7 @@ def test_tool_message_formatting():
     tool_result = user_msg["content"][0]
     assert tool_result["type"] == "tool_result"
     assert tool_result["tool_use_id"] == "toolu_123"
-    assert tool_result["content"] == "2 + 2 = 4"
+    assert tool_result["content"] == "2024-01-01T12:00:00Z"
 
 
 def test_conversation_flow():
@@ -97,21 +97,21 @@ def test_conversation_flow():
         {
             "tool_call": {
                 "id": "toolu_456",
-                "name": "calculate", 
-                "input": {"expression": "5 * 3"}
+                "name": "get_current_time", 
+                "input": {"timezone": "UTC"}
             },
-            "result": "5 * 3 = 15"
+            "result": "2024-01-01 12:00:00"
         }
     ]
     
     # Build complete conversation
     conversation = [
-        {"role": "user", "content": "what is 5*3?"}
+        {"role": "user", "content": "what time is it?"}
     ]
     
     tool_messages = format_tool_messages(mock_tool_calls)
     conversation.extend(tool_messages)
-    conversation.append({"role": "assistant", "content": "Based on the calculation, 5 * 3 equals 15."})
+    conversation.append({"role": "assistant", "content": "It's noon in UTC."})
     
     # Should have 4 messages total
     assert len(conversation) == 4
@@ -143,18 +143,18 @@ def test_multiple_tool_calls():
         {
             "tool_call": {
                 "id": "toolu_1",
-                "name": "calculate", 
-                "input": {"expression": "2 + 2"}
+                "name": "get_current_time", 
+                "input": {"timezone": "UTC"}
             },
-            "result": "4"
+            "result": "2024-01-01 12:00:00"
         },
         {
             "tool_call": {
                 "id": "toolu_2",
-                "name": "calculate", 
-                "input": {"expression": "3 * 3"}
+                "name": "get_current_time", 
+                "input": {"timezone": "US/Eastern"}
             },
-            "result": "9"
+            "result": "2024-01-01 07:00:00"
         }
     ]
     
