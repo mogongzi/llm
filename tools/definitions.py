@@ -11,36 +11,69 @@ from typing import Dict, List, Any
 # Tool definitions following Anthropic's tool calling format
 AVAILABLE_TOOLS: List[Dict[str, Any]] = [
     {
-        "name": "get_weather",
-        "description": "Get current weather information for a specific location",
+        "name": "rails_callbacks",
+        "description": "List Rails model lifecycle callbacks, touches, and dependent cascades for a save/create/update. If RAILS_ROOT env is set, omit rails_root.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "location": {
+                "model": {
                     "type": "string",
-                    "description": "The city name or location to get weather for (e.g., 'Paris', 'Tokyo', 'New York')"
+                    "description": "ActiveRecord model class name (e.g., 'Post', 'Document')"
                 },
-                "units": {
+                "rails_root": {
                     "type": "string",
-                    "enum": ["celsius", "fahrenheit"],
-                    "description": "Temperature unit preference (defaults to celsius if not specified)"
+                    "description": "Absolute path to the Rails application root containing bin/rails (optional if RAILS_ROOT env is set)"
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "Runner timeout in seconds (default 20)"
+                },
+                "force_runtime": {
+                    "type": "boolean",
+                    "description": "If true, skip static scan and use bin/rails runner (slow)."
                 }
             },
-            "required": ["location"]
+            "required": ["model"]
         }
     },
     {
-        "name": "calculate",
-        "description": "Perform mathematical calculations and return the result",
+        "name": "code_search",
+        "description": "Search code under a root directory using ripgrep-like semantics.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "expression": {
-                    "type": "string",
-                    "description": "Mathematical expression to evaluate (e.g., '2 + 2', 'sqrt(16)', '10 * 3.14159')"
-                }
+                "query": {"type": "string"},
+                "root": {"type": "string", "description": "Search root (defaults to RAILS_ROOT env)"},
+                "max_results": {"type": "number"},
+                "context_lines": {"type": "number"}
             },
-            "required": ["expression"]
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "code_read",
+        "description": "Read a file with optional line range.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "start": {"type": "number"},
+                "end": {"type": "number"}
+            },
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "rails_flow_after_persist",
+        "description": "Heuristically summarize methods invoked after saving/creating a model (static scan only).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "model": {"type": "string"},
+                "verb": {"type": "string", "enum": ["create", "save", "update", "destroy"], "description": "Persist verb (default create)"},
+                "rails_root": {"type": "string", "description": "Rails app root (optional if RAILS_ROOT is set)"}
+            },
+            "required": ["model"]
         }
     },
     {

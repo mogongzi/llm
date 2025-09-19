@@ -389,7 +389,7 @@ def _process_user_input(user_input: str, console: Console, thinking_mode: bool, 
         if tools_enabled:
             console.print("[dim]Tools disabled. Claude will not use function calls.[/dim]")
         else:
-            console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
+            console.print("[green]Tools enabled. Claude can now use time and Rails tools.[/green]")
         return None, False, thinking_mode, not tools_enabled  # Toggle tools mode
 
     # Handle clear command

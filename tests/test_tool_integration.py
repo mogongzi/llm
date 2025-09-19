@@ -17,19 +17,14 @@ try:
 except ImportError:
     # Mock imports for testing when modules aren't available
     AVAILABLE_TOOLS = [
-        {"name": "calculate", "description": "Calculator"},
         {"name": "get_current_time", "description": "Get current time"},
-        {"name": "get_weather", "description": "Get weather"}
+        {"name": "rails_callbacks", "description": "Rails callbacks inspector"},
     ]
     
     class MockToolExecutor:
         def execute_tool(self, name, params):
-            if name == "calculate":
-                return {"content": "Mock calculation result"}
-            elif name == "get_current_time":
+            if name == "get_current_time":
                 return {"content": "2024-01-01T12:00:00Z"}
-            elif name == "get_weather":
-                return {"content": "Weather data unavailable"}
             return {"content": "Unknown tool"}
     
     ToolExecutor = MockToolExecutor
@@ -55,20 +50,10 @@ def test_tool_execution():
     """Test tool execution."""
     executor = ToolExecutor()
     
-    # Test calculator
-    calc_result = executor.execute_tool("calculate", {"expression": "sqrt(16) + 2"})
-    assert "content" in calc_result
-    assert calc_result["content"] is not None
-    
     # Test time
     time_result = executor.execute_tool("get_current_time", {"format": "iso"})
     assert "content" in time_result
     assert time_result["content"] is not None
-    
-    # Test weather (will fail without API key, but should handle gracefully)
-    weather_result = executor.execute_tool("get_weather", {"location": "Paris"})
-    assert "content" in weather_result
-    assert weather_result["content"] is not None
 
 
 def test_tool_use_event():
@@ -76,8 +61,8 @@ def test_tool_use_event():
     # Simulate a tool_use event from Claude
     mock_tool_call = {
         "id": "tool_123",
-        "name": "calculate",
-        "input": {"expression": "10 * 5"}
+        "name": "get_current_time",
+        "input": {"timezone": "UTC", "format": "iso"}
     }
     
     # This would be the JSON string from the SSE event
@@ -86,8 +71,8 @@ def test_tool_use_event():
     # Parse and execute
     tool_call = json.loads(tool_use_json)
     assert tool_call["id"] == "tool_123"
-    assert tool_call["name"] == "calculate"
-    assert tool_call["input"] == {"expression": "10 * 5"}
+    assert tool_call["name"] == "get_current_time"
+    assert tool_call["input"] == {"timezone": "UTC", "format": "iso"}
     
     executor = ToolExecutor()
     result = executor.execute_tool(tool_call["name"], tool_call["input"])

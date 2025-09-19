@@ -75,15 +75,15 @@ def test_build_payload_with_thinking():
 
 def test_build_payload_with_tools():
     """Test payload building with tools."""
-    messages = [{"role": "user", "content": "Calculate 2+2"}]
+    messages = [{"role": "user", "content": "What time is it?"}]
     tools = [
         {
-            "name": "calculate",
-            "description": "Perform calculations",
+            "name": "get_current_time",
+            "description": "Get current time",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "expression": {"type": "string"}
+                    "timezone": {"type": "string"}
                 }
             }
         }
@@ -188,7 +188,7 @@ def test_map_events_tool_start():
         "content_block": {
             "type": "tool_use",
             "id": "toolu_123",
-            "name": "calculate"
+            "name": "get_current_time"
         }
     }
     
@@ -201,7 +201,7 @@ def test_map_events_tool_start():
     
     tool_info = json.loads(event_data)
     assert tool_info["id"] == "toolu_123"
-    assert tool_info["name"] == "calculate"
+    assert tool_info["name"] == "get_current_time"
 
 
 def test_map_events_tool_input_delta():
@@ -210,7 +210,7 @@ def test_map_events_tool_input_delta():
         "type": "content_block_delta",
         "delta": {
             "type": "input_json_delta",
-            "partial_json": '{"expression": "2'
+            "partial_json": '{"timezone": "UT'
         }
     }
     
@@ -218,7 +218,7 @@ def test_map_events_tool_input_delta():
     events = list(map_events(iter(lines)))
     
     assert len(events) == 1
-    assert events[0] == ("tool_input_delta", '{"expression": "2')
+    assert events[0] == ("tool_input_delta", '{"timezone": "UT')
 
 
 def test_map_events_tool_ready():
@@ -355,7 +355,7 @@ def test_map_events_complex_flow():
         # Text response
         json.dumps({
             "type": "content_block_delta",
-            "delta": {"type": "text_delta", "text": "I need to calculate this. "}
+            "delta": {"type": "text_delta", "text": "I need the current time. "}
         }),
         # Tool use starts
         json.dumps({
@@ -363,7 +363,7 @@ def test_map_events_complex_flow():
             "content_block": {
                 "type": "tool_use",
                 "id": "toolu_456",
-                "name": "calculate"
+                "name": "get_current_time"
             }
         }),
         # Tool input streaming
@@ -371,14 +371,14 @@ def test_map_events_complex_flow():
             "type": "content_block_delta",
             "delta": {
                 "type": "input_json_delta",
-                "partial_json": '{"expression":'
+                "partial_json": '{"timezone":'
             }
         }),
         json.dumps({
             "type": "content_block_delta",
             "delta": {
                 "type": "input_json_delta",
-                "partial_json": ' "2 + 2"}'
+                "partial_json": ' "UTC"}'
             }
         }),
         # Tool input complete
@@ -402,10 +402,10 @@ def test_map_events_complex_flow():
     
     expected_events = [
         ("model", "claude-3-sonnet"),
-        ("text", "I need to calculate this. "),
-        ("tool_start", '{"id": "toolu_456", "name": "calculate"}'),
-        ("tool_input_delta", '{"expression":'),
-        ("tool_input_delta", ' "2 + 2"}'),
+        ("text", "I need the current time. "),
+        ("tool_start", '{"id": "toolu_456", "name": "get_current_time"}'),
+        ("tool_input_delta", '{"timezone":'),
+        ("tool_input_delta", ' "UTC"}'),
         ("tool_ready", None),
         ("text", "The answer is 4."),
         ("tokens", "75|50|25|0.001050"),  # 50*3/1M + 25*15/1M

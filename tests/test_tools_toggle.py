@@ -26,7 +26,7 @@ def test_tools_command_logic():
             if tools_enabled:
                 console.print("[dim]Tools disabled. Claude will not use function calls.[/dim]")
             else:
-                console.print("[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]")
+                console.print("[green]Tools enabled. Claude can now use time and Rails tools.[/green]")
             return not tools_enabled  # Toggle tools mode
         return tools_enabled
     
@@ -34,7 +34,7 @@ def test_tools_command_logic():
     tools_enabled = False
     tools_enabled = process_tools_command('/tools', tools_enabled, console)
     assert tools_enabled is True
-    assert "[green]Tools enabled. Claude can now use calculator, weather, and time functions.[/green]" in console.messages
+    assert "[green]Tools enabled. Claude can now use time and Rails tools.[/green]" in console.messages
     
     # Test disabling tools
     console.messages.clear()
