@@ -23,6 +23,31 @@ const {
   PORT = "8000",
 } = process.env as EnvConfig;
 
+// ANSI color helpers to distinguish request/response logs in the console
+const COLOR_RESET = "\x1b[0m";
+const COLOR_REQUEST = "\x1b[36m"; // cyan
+const COLOR_RESPONSE = "\x1b[32m"; // green
+const COLOR_INFO = "\x1b[32m"; // green
+const COLOR_URL = "\x1b[33m"; // yellow
+
+const logRequest = (message: unknown) => {
+  console.log(`${COLOR_REQUEST}${String(message)}${COLOR_RESET}`);
+};
+
+const logResponse = (message: unknown) => {
+  console.log(`${COLOR_RESPONSE}${String(message)}${COLOR_RESET}`);
+};
+
+const logInfo = (message: unknown, highlight?: string) => {
+  if (highlight) {
+    console.log(
+      `${COLOR_INFO}${String(message)}${COLOR_URL}${highlight}${COLOR_RESET}`,
+    );
+    return;
+  }
+  console.log(`${COLOR_INFO}${String(message)}${COLOR_RESET}`);
+};
+
 console.log(LLM_API_ENDPOINT);
 
 const app = express();
@@ -42,9 +67,10 @@ app.post("/mock", async (req: Request, res: Response) => {
     }
   } catch (e: unknown) {
     const error = e as Error;
-    return res
-      .status(400)
-      .json({ error: "mock_invalid_body", message: error?.message || String(e) });
+    return res.status(400).json({
+      error: "mock_invalid_body",
+      message: error?.message || String(e),
+    });
   }
 
   const pickString = (value: unknown): string | undefined => {
@@ -156,7 +182,7 @@ async function getToken(): Promise<string> {
     const text = await resp.text().catch(() => "");
     throw new Error(`Token request failed (${resp.status}): ${text}`);
   }
-  const data = await resp.json() as TokenResponse;
+  const data = (await resp.json()) as TokenResponse;
   token = data.access_token;
   const ttl = Number(data.expires_in ?? 300);
   tokenExp = Date.now() + ttl * 1000;
@@ -174,13 +200,13 @@ app.post("/invoke", async (req: Request, res: Response) => {
     if (bodyBuf) {
       try {
         const requestData = JSON.parse(bodyBuf.toString());
-        console.log("==== Received Request ====");
-        console.log(JSON.stringify(requestData, null, 2));
-        console.log("=======================");
+        logRequest("==== Received Request ====");
+        logRequest(JSON.stringify(requestData, null, 2));
+        logRequest("=======================");
       } catch (e: unknown) {
-        console.log("==== Raw Request Body ====");
-        console.log(bodyBuf.toString());
-        console.log("=======================");
+        logRequest("==== Raw Request Body ====");
+        logRequest(bodyBuf.toString());
+        logRequest("=======================");
       }
     }
 
@@ -214,11 +240,11 @@ app.post("/invoke", async (req: Request, res: Response) => {
     const nodeStream = Readable.fromWeb(upstreamResp.body);
 
     // Log response chunks to console
-    console.log("==== API Response ====");
+    logResponse("==== API Response ====");
     nodeStream.on("data", (chunk) => {
-      console.log(chunk.toString());
+      logResponse(chunk.toString());
     });
-    console.log("==========================");
+    logResponse("==========================");
 
     nodeStream.on("error", (e: Error) => {
       if (!res.headersSent) res.status(502);
@@ -236,7 +262,8 @@ app.post("/invoke", async (req: Request, res: Response) => {
 });
 
 app.listen(Number(PORT), HOST, () => {
-  console.log(
-    `SAP AI Core Service proxy listening at http://${HOST}:${PORT}/invoke`,
+  logInfo(
+    "SAP AI Core Service proxy listening at ",
+    `http://${HOST}:${PORT}/invoke`,
   );
 });
