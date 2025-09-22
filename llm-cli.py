@@ -40,7 +40,6 @@ from util.path_browser import PathBrowser
 from rag.manager import RAGManager
 from streaming_client import StreamingClient, StreamResult
 from chat.recorder import SessionRecorder
-from util.router import detect_tools_for_query
 
 # ---------------- Configuration ----------------
 DEFAULT_URL = "http://127.0.0.1:8000/invoke"
