@@ -37,6 +37,14 @@ class ToolExecutor:
         try:
             if tool_name == "get_current_time":
                 return self._get_current_time(parameters)
+            elif tool_name == "rails_callbacks":
+                return self._rails_callbacks(parameters)
+            elif tool_name == "code_search":
+                return self._code_search(parameters)
+            elif tool_name == "code_read":
+                return self._code_read(parameters)
+            elif tool_name == "rails_flow_after_persist":
+                return self._rails_flow_after_persist(parameters)
             else:
                 return {
                     "error": f"Unknown tool: {tool_name}",
