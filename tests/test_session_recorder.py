@@ -19,15 +19,15 @@ def test_session_recorder_json_and_markdown(tmp_path):
     rec.record_first_result(t1, model=r1.model_name, tokens=r1.tokens, cost=r1.cost, text=r1.text)
 
     # Turn 2: with tools and follow-up
-    t2 = rec.start_turn("Calculate 2+2", {"base_context_status": "0 files", "rag_enabled": False})
+    t2 = rec.start_turn("What time is it?", {"base_context_status": "0 files", "rag_enabled": False})
     rf = DummyResult("Using tool...\n", 10, 0.0005, model="gpt-5")
     rec.record_first_result(t2, model=rf.model_name, tokens=rf.tokens, cost=rf.cost, text=rf.text)
     tool_calls = [{
-        "tool_call": {"id": "toolu_1", "name": "calculate", "input": {"expression": "2+2"}},
-        "result": "4"
+        "tool_call": {"id": "toolu_1", "name": "get_current_time", "input": {"timezone": "UTC"}},
+        "result": "2024-01-01 12:00:00"
     }]
     rec.record_tool_calls(t2, tool_calls)
-    r2 = DummyResult("Answer: 4\n", 8, 0.0003, model="gpt-5")
+    r2 = DummyResult("Answer: 2024-01-01 12:00:00\n", 8, 0.0003, model="gpt-5")
     rec.record_followup_result(t2, model=r2.model_name, tokens=r2.tokens, cost=r2.cost, text=r2.text)
 
     # Save and export
@@ -54,5 +54,4 @@ def test_session_recorder_json_and_markdown(tmp_path):
     assert "# Chat Session" in md
     assert "## Turn 1" in md and "## Turn 2" in md
     assert "### Tools" in md  # For turn 2
-    assert "calculate" in md and "4" in md
-
+    assert "get_current_time" in md and "2024-01-01 12:00:00" in md
