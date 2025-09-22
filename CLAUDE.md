@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important
+- **`util/` folder**: Contains utility functions and helper modules used internally by the project
+- **`tools/` folder**: Contains tool definitions and implementations that can be invoked by LLMs via function calling or agent workflows
+
 ## Development Commands
 
 **Prerequisites:**

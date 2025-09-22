@@ -113,29 +113,6 @@ def handle_streaming_request(
             # For Bedrock/Anthropic: pass system prompt via top-level field
             extra_kwargs["system_prompt"] = strict_rag_system
 
-    # Add tool-use hint for Rails callbacks when tools are enabled
-    tool_hint_system = None
-    if tools_enabled:
-        tool_hint_system = (
-            "When the user asks about Rails model lifecycle callbacks (e.g., 'list all invoked methods after Model.save/create/update' or 'after the Document model gets saved, which callbacks run?'), call the tool named rails_callbacks. "
-            "Pass {model: '<ClassName>'}. Do not ask for the Rails path if the RAILS_ROOT environment variable is set; the tool will use it automatically. "
-            "After tool results return, present a concise, numbered list in the format 'Model.save! will execute:' including before_/around_/after_ callbacks, after_commit entries, and '→ touches' and '→ cascades' lines. Prefer tool results over speculation."
-        )
-
-    if tool_hint_system:
-        if session.provider_name == "azure":
-            # Prepend as a system message (and merge with strict RAG if present)
-            sys_msgs = []
-            if rag_enabled:
-                sys_msgs.append({"role": "system", "content": strict_rag_system})
-            sys_msgs.append({"role": "system", "content": tool_hint_system})
-            messages_for_llm = sys_msgs + messages_for_llm
-        else:
-            # Combine into top-level system prompt for Bedrock/Anthropic
-            extra_kwargs["system_prompt"] = (
-                ((strict_rag_system + "\n\n") if rag_enabled else "") + tool_hint_system
-            )
-
     payload = session.provider.build_payload(
         messages_for_llm,
         model=None,

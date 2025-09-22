@@ -11,7 +11,7 @@ except ImportError:
 class MockConsole:
     def __init__(self):
         self.messages = []
-    
+
     def print(self, message):
         self.messages.append(message)
 
@@ -19,23 +19,23 @@ class MockConsole:
 def test_tools_command_logic():
     """Test the /tools command logic without imports."""
     console = MockConsole()
-    
+
     # Simulate the command processing logic
     def process_tools_command(cleaned_input, tools_enabled, console):
         if cleaned_input == '/tools':
             if tools_enabled:
                 console.print("[dim]Tools disabled. Claude will not use function calls.[/dim]")
             else:
-                console.print("[green]Tools enabled. Claude can now use time and Rails tools.[/green]")
+                console.print("[green]Tools enabled. Claude can now use time tool.[/green]")
             return not tools_enabled  # Toggle tools mode
         return tools_enabled
-    
+
     # Test enabling tools
     tools_enabled = False
     tools_enabled = process_tools_command('/tools', tools_enabled, console)
     assert tools_enabled is True
-    assert "[green]Tools enabled. Claude can now use time and Rails tools.[/green]" in console.messages
-    
+    assert "[green]Tools enabled. Claude can now use time tool.[/green]" in console.messages
+
     # Test disabling tools
     console.messages.clear()
     tools_enabled = process_tools_command('/tools', tools_enabled, console)
@@ -46,14 +46,14 @@ def test_tools_command_logic():
 def test_conditional_tools_parameter():
     """Test conditional tools parameter logic."""
     AVAILABLE_TOOLS = ["tool1", "tool2", "tool3"]  # Mock tools
-    
+
     # Test with tools enabled
     tools_enabled = True
     tools_param = AVAILABLE_TOOLS if tools_enabled else None
     assert tools_param == AVAILABLE_TOOLS
-    
+
     # Test with tools disabled
-    tools_enabled = False  
+    tools_enabled = False
     tools_param = AVAILABLE_TOOLS if tools_enabled else None
     assert tools_param is None
 
