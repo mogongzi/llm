@@ -8,7 +8,7 @@ Event = Tuple[str, Optional[str]]  # ("model"|"text"|"thinking"|"tool_start"|"to
 
 
 def build_payload(
-    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, system_prompt: Optional[str] = None, **_: dict
+    messages: List[dict], *, model: Optional[str] = None, max_tokens: int = 4096, temperature: Optional[float] = None, thinking: bool = False, thinking_tokens: int = 1024, tools: Optional[List[dict]] = None, context_content: Optional[str] = None, system_prompt: Optional[str] = None, stop_sequences: Optional[List[str]] = None, **_: dict
 ) -> dict:
     """Construct Bedrock/Anthropic-style chat payload.
 
@@ -38,6 +38,10 @@ def build_payload(
 
     if tools:
         payload["tools"] = tools
+
+    # Optional stop sequences (Anthropic-compatible)
+    if stop_sequences:
+        payload["stop_sequences"] = stop_sequences
 
     return payload
 

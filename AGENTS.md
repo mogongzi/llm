@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Important
+- **`util/` folder**: Contains utility functions and helper modules used internally by the project
+- **`tools/` folder**: Contains tool definitions and implementations that can be invoked by LLMs via function calling but not agent flow.
+- Execute `source .venv/bin/activate` before run `python3`, `python` or `pytest` commands
+- `tools/executor.py` is not for agent but just for main CLI
+- **`agents/tools/** is used for agent flow
+
 ## Project Structure & Module Organization
 - `llm-cli.py`: Main Python CLI; streams SSE and renders live Markdown. Supports multiline input, tool calls, context, and RAG.
 - `streaming_client.py`: SSE client + live renderer integration and tool execution wiring.

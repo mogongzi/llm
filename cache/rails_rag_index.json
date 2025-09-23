@@ -309,6 +309,15 @@
           "modules": 0
         },
         {
+          "path": "config/definitions.rb",
+          "size": 1134,
+          "lines": 31,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
           "path": "config/environments/production.rb",
           "size": 4819,
           "lines": 107,
@@ -2561,8 +2570,8 @@
     }
   },
   "metadata": {
-    "created_at": 1758554623.9039161,
-    "build_time": 0.01679706573486328,
+    "created_at": 1758595570.202761,
+    "build_time": 0.1889967918395996,
     "project_root": "/Users/I503354/personal/ruby/depot",
     "version": "1.0.0",
     "enabled_features": {

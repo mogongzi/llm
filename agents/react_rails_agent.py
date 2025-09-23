@@ -14,13 +14,14 @@ from rich.console import Console
 
 from agents.tools.base_tool import BaseTool
 from agents.tools.ripgrep_tool import RipgrepTool
+from agents.tools.sql_rails_search import SQLRailsSearchTool
+from agents.tools.ast_grep_tool import AstGrepTool
+from agents.tools.ctags_tool import CtagsTool
 from agents.tools.model_analyzer import ModelAnalyzer
 from agents.tools.controller_analyzer import ControllerAnalyzer
 from agents.tools.route_analyzer import RouteAnalyzer
 from agents.tools.migration_analyzer import MigrationAnalyzer
 from agents.prompts.system_prompt import RAILS_REACT_SYSTEM_PROMPT
-from util.sse_client import SSEClient
-from providers import get_provider
 
 
 @dataclass
@@ -40,30 +41,47 @@ class ReactRailsAgent:
     Uses the ReAct pattern: Reasoning → Action → Observation → (repeat) → Answer
     """
 
-    def __init__(self, project_root: Optional[str] = None):
+    def __init__(self, project_root: Optional[str] = None, session=None):
         """
         Initialize the ReAct Rails agent.
 
         Args:
             project_root: Root directory of the Rails project
+            session: ChatSession from llm-cli for LLM communication
         """
         self.project_root = project_root
         self.console = Console()
         self.tools: Dict[str, BaseTool] = {}
         self.conversation_history: List[Dict[str, Any]] = []
         self.react_steps: List[ReActStep] = []
+        self.session = session
+        self.allowed_tools = {
+            'ripgrep', 'sql_rails_search', 'ast_grep', 'ctags',
+            'model_analyzer', 'controller_analyzer', 'route_analyzer', 'migration_analyzer'
+        }
+        self.tool_synonyms = {
+            'search_code_semantic': 'ripgrep',
+            'search_codebase': 'ripgrep',
+            'code_search': 'ripgrep',
+            'grep': 'ripgrep',
+            'sql_search': 'sql_rails_search',
+            'astgrep': 'ast_grep',
+            'tags': 'ctags',
+        }
 
         # Initialize tools
         self._init_tools()
 
-        # LLM client for reasoning
-        self.provider = get_provider("bedrock")  # Default to bedrock
-        self.sse_client = SSEClient(self.provider)
+        # Define tool schemas for LLM function calling
+        self.tool_schemas = self._create_tool_schemas()
 
     def _init_tools(self) -> None:
         """Initialize available tools for the agent."""
         try:
             self.tools['ripgrep'] = RipgrepTool(self.project_root)
+            self.tools['sql_rails_search'] = SQLRailsSearchTool(self.project_root)
+            self.tools['ast_grep'] = AstGrepTool(self.project_root)
+            self.tools['ctags'] = CtagsTool(self.project_root)
             self.tools['model_analyzer'] = ModelAnalyzer(self.project_root)
             self.tools['controller_analyzer'] = ControllerAnalyzer(self.project_root)
             self.tools['route_analyzer'] = RouteAnalyzer(self.project_root)
@@ -72,6 +90,160 @@ class ReactRailsAgent:
             self.console.print(f"[dim]Initialized {len(self.tools)} tools for Rails analysis[/dim]")
         except Exception as e:
             self.console.print(f"[red]Error initializing tools: {e}[/red]")
+
+    def _create_tool_schemas(self) -> List[Dict[str, Any]]:
+        """Create tool schemas for LLM function calling."""
+        return [
+            {
+                "name": "ripgrep",
+                "description": "Fast text search in Rails codebase using ripgrep",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {
+                            "type": "string",
+                            "description": "Regular expression pattern to search for"
+                        },
+                        "file_types": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "File extensions to search (e.g., ['rb', 'erb'])"
+                        },
+                        "context": {
+                            "type": "integer",
+                            "description": "Number of context lines to show around matches"
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of results to return"
+                        }
+                    },
+                    "required": ["pattern"]
+                }
+            },
+            {
+                "name": "ast_grep",
+                "description": "Structural Ruby search using ast-grep patterns",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {"type": "string", "description": "ast-grep pattern, e.g., 'class $NAME'"},
+                        "paths": {"type": "array", "items": {"type": "string"}},
+                        "max_results": {"type": "integer"}
+                    },
+                    "required": ["pattern"]
+                }
+            },
+            {
+                "name": "ctags",
+                "description": "Query Ruby symbols using universal-ctags",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string"},
+                        "exact": {"type": "boolean"},
+                        "max_results": {"type": "integer"}
+                    },
+                    "required": ["symbol"]
+                }
+            },
+            {
+                "name": "sql_rails_search",
+                "description": "Given SQL, infer ActiveRecord patterns and find generating code",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "Raw SQL to analyze"
+                        },
+                        "file_types": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "File extensions to search (e.g., ['rb','erb'])"
+                        },
+                        "max_patterns": {
+                            "type": "integer",
+                            "description": "Max inferred patterns to try"
+                        },
+                        "max_results_per_pattern": {
+                            "type": "integer",
+                            "description": "Limit matches per pattern"
+                        }
+                    },
+                    "required": ["sql"]
+                }
+            },
+            {
+                "name": "model_analyzer",
+                "description": "Analyze Rails model files for validations, associations, callbacks, and methods",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "model_name": {
+                            "type": "string",
+                            "description": "Name of the Rails model to analyze"
+                        },
+                        "focus": {
+                            "type": "string",
+                            "enum": ["validations", "associations", "callbacks", "methods", "all"],
+                            "description": "Specific aspect to focus on"
+                        }
+                    },
+                    "required": ["model_name"]
+                }
+            },
+            {
+                "name": "controller_analyzer",
+                "description": "Analyze Rails controller files for actions, filters, and methods",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "controller_name": {
+                            "type": "string",
+                            "description": "Name of the Rails controller to analyze"
+                        },
+                        "action": {
+                            "type": "string",
+                            "description": "Specific action to analyze, or 'all' for all actions"
+                        }
+                    },
+                    "required": ["controller_name"]
+                }
+            },
+            {
+                "name": "route_analyzer",
+                "description": "Analyze Rails routes configuration",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "focus": {
+                            "type": "string",
+                            "description": "What to focus on in routes analysis"
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "migration_analyzer",
+                "description": "Analyze Rails database migrations",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "migration_type": {
+                            "type": "string",
+                            "description": "Type of migration to analyze or 'all'"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Number of recent migrations to analyze"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        ]
 
     def set_project_root(self, project_root: str) -> None:
         """Update the project root and reinitialize tools."""
@@ -108,7 +280,7 @@ class ReactRailsAgent:
             self.console.print(f"[red]{error_msg}[/red]")
             return error_msg
 
-    async def _react_loop(self, user_query: str, max_steps: int = 10) -> str:
+    async def _react_loop(self, user_query: str, max_steps: int = 4) -> str:
         """
         Execute the ReAct reasoning and acting loop.
 
@@ -127,19 +299,26 @@ class ReactRailsAgent:
 
         for step in range(max_steps):
             try:
-                # Get LLM reasoning/action
-                response = await self._call_llm(messages)
+                self.console.print(f"[dim]Step {step + 1}/{max_steps}[/dim]")
+
+                # Get LLM reasoning/action with streaming display
+                response = self._call_llm(messages)
 
                 # Parse the response to determine next action
                 action = self._parse_llm_response(response)
 
+                # Always add assistant response to conversation
+                messages.append({"role": "assistant", "content": response})
+
                 if action['type'] == 'thought':
-                    # Agent is reasoning
+                    # Agent is reasoning (already streamed during LLM call)
                     self.react_steps.append(ReActStep(
                         step_type='thought',
                         content=action['content']
                     ))
-                    self.console.print(f"[yellow]💭 Thought:[/yellow] {action['content']}")
+                    # Note: Thought content was already streamed during _call_llm
+                    # Continue to next step to let agent take action
+                    continue
 
                 elif action['type'] == 'action':
                     # Agent wants to use a tool
@@ -167,9 +346,9 @@ class ReactRailsAgent:
 
                     self.console.print(f"[green]👁 Observation:[/green] {str(tool_output)[:200]}...")
 
-                    # Add tool result to conversation
-                    messages.append({"role": "assistant", "content": response})
-                    messages.append({"role": "user", "content": f"Tool result: {tool_output}"})
+                    # Add compact tool result summary to save tokens
+                    summary = self._summarize_tool_result(tool_name, tool_output)
+                    messages.append({"role": "user", "content": f"Tool result: {summary}"})
 
                 elif action['type'] == 'answer':
                     # Agent has final answer
@@ -182,19 +361,20 @@ class ReactRailsAgent:
                     return action['content']
 
                 else:
-                    # Add the response and continue
-                    messages.append({"role": "assistant", "content": response})
+                    # Unknown response type, continue to next step
+                    pass
 
             except Exception as e:
-                self.console.print(f"[red]Error in ReAct step {step}: {e}[/red]")
+                self.console.print(f"[red]Error in ReAct step {step + 1}: {e}[/red]")
                 break
 
-        # If we reach max steps, return summary
-        return self._generate_summary()
+        # If we reach max steps, return summary with timeout message
+        self.console.print(f"[yellow]⏱️ Reached maximum steps ({max_steps}). Stopping analysis.[/yellow]")
+        return self._generate_summary_with_timeout()
 
-    async def _call_llm(self, messages: List[Dict[str, Any]]) -> str:
+    def _call_llm(self, messages: List[Dict[str, Any]]) -> str:
         """
-        Call the LLM with conversation messages.
+        Call the LLM with conversation messages using the session from llm-cli.
 
         Args:
             messages: Conversation messages
@@ -202,28 +382,88 @@ class ReactRailsAgent:
         Returns:
             LLM response text
         """
-        try:
-            # For now, use a simple prompt-based approach
-            # In full implementation, this would use the streaming client
-
-            # Convert messages to simple prompt format
-            prompt_parts = []
-            for msg in messages:
-                if msg['role'] == 'system':
-                    prompt_parts.append(f"System: {msg['content']}")
-                elif msg['role'] == 'user':
-                    prompt_parts.append(f"Human: {msg['content']}")
-                elif msg['role'] == 'assistant':
-                    prompt_parts.append(f"Assistant: {msg['content']}")
-
-            prompt = "\n\n".join(prompt_parts) + "\n\nAssistant:"
-
-            # Placeholder for actual LLM call
-            # In full implementation, this would use the SSE client
+        if not self.session:
+            # Fallback to mock for testing without session
             return self._mock_llm_response(messages[-1]['content'])
 
+        try:
+            # Use the shared StreamingClient + provider mapper to avoid mismatched SSE parsing
+            if hasattr(self.session, 'streaming_client') and self.session.streaming_client:
+                # Separate system prompt from messages
+                system_prompt = None
+                user_messages = []
+
+                for msg in messages:
+                    if msg['role'] == 'system':
+                        system_prompt = msg['content']
+                    else:
+                        user_messages.append(msg)
+
+                payload = self.session.provider.build_payload(
+                    user_messages,
+                    model=None,
+                    max_tokens=self.session.max_tokens,
+                    thinking=False,
+                    tools=self.tool_schemas,  # Enable provider-managed tool calls
+                    context_content=None,
+                    rag_enabled=False,
+                    system_prompt=system_prompt,
+                    stop_sequences=["\nObservation:", "\nAnswer:"],
+                )
+
+                # Use live rendering for nicer streamed output while we accumulate text
+                result = self.session.streaming_client.stream_with_live_rendering(
+                    self.session.url,
+                    payload,
+                    self.session.provider.map_events,
+                    console=self.console,
+                    use_thinking=False,
+                    provider_name=getattr(self.session, 'provider_name', 'bedrock'),
+                    show_model_name=False,
+                    live_window=6,
+                )
+
+                # If the model called tools, send a follow-up request with tool results
+                if result.tool_calls:
+                    tool_msgs = self._format_tool_messages(result.tool_calls)
+                    # Build follow-up messages (append tool_use + tool_result)
+                    followup_messages = user_messages + tool_msgs
+
+                    followup_payload = self.session.provider.build_payload(
+                        followup_messages,
+                        model=None,
+                        max_tokens=self.session.max_tokens,
+                        thinking=False,
+                        tools=self.tool_schemas,
+                        context_content=None,
+                        rag_enabled=False,
+                        system_prompt=system_prompt,
+                    )
+
+                    follow = self.session.streaming_client.stream_with_live_rendering(
+                        self.session.url,
+                        followup_payload,
+                        self.session.provider.map_events,
+                        console=self.console,
+                        use_thinking=False,
+                        provider_name=getattr(self.session, 'provider_name', 'bedrock'),
+                        show_model_name=False,
+                        live_window=6,
+                    )
+                    return (follow.text or "").strip() or ""
+
+                # No tools used; return first response text
+                text = (result.text or "").strip()
+                if not text:
+                    return "Error: Incomplete or empty response from LLM."
+                return text
+            else:
+                return self._mock_llm_response(messages[-1]['content'])
+
         except Exception as e:
-            return f"Error calling LLM: {e}"
+            self.console.print(f"[red]Error calling LLM: {e}[/red]")
+            # Fallback to mock
+            return self._mock_llm_response(messages[-1]['content'])
 
     def _mock_llm_response(self, user_query: str) -> str:
         """
@@ -281,13 +521,72 @@ Action: migration_analyzer
 Input: {"migration_type": "all", "limit": 5}
 """
 
-        else:
-            return """
-Thought: I need to understand this Rails codebase better. Let me start with a general search.
+        # SQL-style queries
+        if ('select' in query_lower and 'from' in query_lower) or 'where' in query_lower:
+            # Route raw SQL to the specialized tool
+            return f"""
+Thought: This looks like a raw SQL pattern. I should infer the corresponding ActiveRecord/Arel patterns and search the codebase.
+
+Action: sql_rails_search
+Input: {{"sql": {json.dumps(user_query)}}}
+"""
+
+        # Fallback generic search
+        return """
+Thought: I need to search for SQL-related code in this Rails project to find where this query might be generated.
 
 Action: ripgrep
-Input: {"pattern": "class.*ApplicationRecord", "file_types": ["rb"]}
+Input: {"pattern": "SELECT|WHERE|FROM", "file_types": ["rb", "erb"]}
 """
+
+    def _format_tool_messages(self, tool_calls_made: List[dict]) -> List[dict]:
+        """Format tool calls and results into Anthropic tool_use/tool_result messages."""
+        if not tool_calls_made:
+            return []
+
+        tool_use_blocks = []
+        for tool_data in tool_calls_made:
+            tc = tool_data.get("tool_call", {})
+            tool_use_blocks.append({
+                "type": "tool_use",
+                "id": tc.get("id"),
+                "name": tc.get("name"),
+                "input": tc.get("input", {}),
+            })
+
+        tool_result_blocks = []
+        for tool_data in tool_calls_made:
+            tc = tool_data.get("tool_call", {})
+            result = tool_data.get("result", "")
+            tool_result_blocks.append({
+                "type": "tool_result",
+                "tool_use_id": tc.get("id"),
+                "content": result,
+            })
+
+        return [
+            {"role": "assistant", "content": tool_use_blocks},
+            {"role": "user", "content": tool_result_blocks},
+        ]
+
+    def _extract_json_after(self, text: str, start_idx: int) -> Optional[Dict[str, Any]]:
+        import json as _json
+        brace_idx = text.find('{', start_idx)
+        if brace_idx == -1:
+            return None
+        depth = 0
+        for i in range(brace_idx, len(text)):
+            ch = text[i]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return _json.loads(text[brace_idx:i+1])
+                    except Exception:
+                        return None
+        return None
 
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """
@@ -301,35 +600,57 @@ Input: {"pattern": "class.*ApplicationRecord", "file_types": ["rb"]}
         """
         response = response.strip()
 
-        # Look for structured patterns
+        # If the model already provided a final answer, return it
+        if "Answer:" in response:
+            answer_content = response.split("Answer:")[-1].strip()
+            return {"type": "answer", "content": answer_content}
+
+        # Prefer the first Action block (token-saving and deterministic)
+        act_idx = response.find("Action:")
+        if act_idx != -1:
+            after = response[act_idx + len("Action:") :]
+            # Tool name is the first non-empty line after Action:
+            tool_line = ""
+            for line in after.splitlines():
+                ls = line.strip()
+                if ls:
+                    tool_line = ls
+                    break
+            tool_name = tool_line.split()[0].strip()
+
+            # Map synonyms and validate
+            tool_name = self.tool_synonyms.get(tool_name, tool_name)
+            if tool_name not in self.allowed_tools:
+                # Unknown tool; instruct the model to replan with allowed tools
+                return {"type": "thought", "content": f"Requested tool '{tool_line}' is unavailable. Use only allowed tools: {sorted(self.allowed_tools)}. Replan with ripgrep or sql_rails_search."}
+
+            # Extract JSON after the first Input:
+            inp_idx = response.find("Input:", act_idx)
+            tool_input: Dict[str, Any] = {}
+            if inp_idx != -1:
+                parsed = self._extract_json_after(response, inp_idx)
+                if isinstance(parsed, dict):
+                    tool_input = parsed
+            else:
+                # Fallback: detect function-call style like tool("…")
+                import re as _re
+                m = _re.search(rf"{tool_name}\s*\(\s*(['\"])(.*?)\1", after)
+                if m:
+                    arg = m.group(2)
+                    if tool_name == 'ripgrep':
+                        tool_input = {"pattern": arg, "file_types": ["rb", "erb"]}
+                    elif tool_name == 'sql_rails_search':
+                        tool_input = {"sql": arg}
+
+            return {"type": "action", "tool": tool_name, "input": tool_input}
+
+        # Thought-only content
         if "Thought:" in response:
             thought_content = response.split("Thought:")[-1].split("Action:")[0].strip()
             return {"type": "thought", "content": thought_content}
 
-        elif "Action:" in response:
-            action_part = response.split("Action:")[-1].strip()
-            lines = action_part.split('\n')
-            tool_name = lines[0].strip()
-
-            # Look for input
-            tool_input = {}
-            if "Input:" in response:
-                input_part = response.split("Input:")[-1].strip()
-                try:
-                    tool_input = json.loads(input_part)
-                except:
-                    # Fallback to simple parsing
-                    tool_input = {"query": input_part}
-
-            return {"type": "action", "tool": tool_name, "input": tool_input}
-
-        elif "Answer:" in response:
-            answer_content = response.split("Answer:")[-1].strip()
-            return {"type": "answer", "content": answer_content}
-
-        else:
-            # Default: treat as thought
-            return {"type": "thought", "content": response}
+        # Default: treat whole response as thought
+        return {"type": "thought", "content": response}
 
     async def _execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
         """
@@ -352,6 +673,34 @@ Input: {"pattern": "class.*ApplicationRecord", "file_types": ["rb"]}
         except Exception as e:
             return f"Error executing {tool_name}: {e}"
 
+    def _summarize_tool_result(self, tool_name: str, result: Any) -> str:
+        """Create a compact summary suitable to feed back to the model."""
+        try:
+            if isinstance(result, dict):
+                # ripgrep style: {matches: [{file,line,content,..}], total: N}
+                if 'matches' in result and isinstance(result['matches'], list):
+                    matches = result['matches']
+                    total = result.get('total', len(matches))
+                    top = matches[:5]
+                    files = sorted({m.get('file') for m in top if isinstance(m, dict)})
+                    short = ", ".join(f"{m.get('file')}:{m.get('line')}" for m in top if isinstance(m, dict))
+                    extras = f"; showing {len(top)} of {total}" if total > len(top) else ""
+                    return f"{total} matches in {len(files)} files: {short}{extras}"
+                # sql_rails_search style
+                if 'results' in result and isinstance(result['results'], list):
+                    results = result['results']
+                    total = result.get('total_results', len(results))
+                    top = results[:5]
+                    short = ", ".join(f"{r.get('file')}:{r.get('line')} ({r.get('matched_pattern')})" for r in top if isinstance(r, dict))
+                    extras = f"; showing {len(top)} of {total}" if total > len(top) else ""
+                    return f"{total} candidates: {short}{extras}"
+            # Fallback to safe string
+            s = str(result)
+            return s if len(s) <= 800 else s[:800] + "…"
+        except Exception:
+            s = str(result)
+            return s if len(s) <= 800 else s[:800] + "…"
+
     def _generate_summary(self) -> str:
         """Generate a summary of the ReAct session."""
         if not self.react_steps:
@@ -368,6 +717,34 @@ Input: {"pattern": "class.*ApplicationRecord", "file_types": ["rb"]}
                 summary_parts.append(f"**Result:** {step.content[:200]}...")
             elif step.step_type == 'answer':
                 summary_parts.append(f"**Answer:** {step.content}")
+
+        return "\n\n".join(summary_parts)
+
+    def _generate_summary_with_timeout(self) -> str:
+        """Generate a summary when the ReAct loop times out."""
+        if not self.react_steps:
+            return "## Analysis Timeout\n\nNo analysis steps were completed before reaching the step limit."
+
+        summary_parts = [
+            "## Analysis Timeout - Partial Results\n",
+            f"⚠️ **Analysis stopped after reaching the maximum of 5 steps without finding a definitive answer.**\n"
+        ]
+
+        # Show what was attempted
+        action_count = sum(1 for step in self.react_steps if step.step_type == 'action')
+        summary_parts.append(f"**Tools executed:** {action_count}")
+
+        # Show the reasoning trail
+        summary_parts.append("### Analysis Trail:")
+        for i, step in enumerate(self.react_steps, 1):
+            if step.step_type == 'thought':
+                summary_parts.append(f"{i}. **Thought:** {step.content[:100]}...")
+            elif step.step_type == 'action':
+                summary_parts.append(f"{i}. **Action:** Used {step.tool_name}")
+            elif step.step_type == 'observation':
+                summary_parts.append(f"{i}. **Result:** {step.content[:100]}...")
+
+        summary_parts.append("\n**Suggestion:** Try a more specific query or use the standalone rule-based agent for simpler pattern matching.")
 
         return "\n\n".join(summary_parts)
 

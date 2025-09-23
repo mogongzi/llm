@@ -4,8 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Important
 - **`util/` folder**: Contains utility functions and helper modules used internally by the project
-- **`tools/` folder**: Contains tool definitions and implementations that can be invoked by LLMs via function calling or agent workflows
+- **`tools/` folder**: Contains tool definitions and implementations that can be invoked by LLMs via function calling but not agent flow
 - Execute `source .venv/bin/activate` before run `python3`, `python` or `pytest` commands
+- `tools/executor.py` is not for agent but just for main CLI
+- **`agents/tools/** is used for agent flow
 
 ## Development Commands
 

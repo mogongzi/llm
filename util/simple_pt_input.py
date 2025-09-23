@@ -243,7 +243,7 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
         token_info: Optional token usage string to display on the right side
         thinking_mode: Whether thinking mode is currently enabled
         tools_enabled: Whether tools mode is currently enabled
-        agent_enabled: Whether ReAct agent mode is currently enabled
+        agent_enabled: Whether ReAct agent mode is currently enabled (deprecated, ignored)
         show_instructions: Whether to show the usage instructions
     """
     # Build instructions with status indicators
@@ -261,13 +261,8 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
     else:
         tools_part = "/tools functions"
 
-    # Add agent mode status
-    if agent_enabled:
-        agent_part = "/agent agent [ON]"
-    else:
-        agent_part = "/agent agent"
-
-    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    {agent_part}    Esc/Ctrl+C=cancel"
+    # Agent mode is deprecated - no longer shown
+    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    Esc/Ctrl+C=cancel"
 
     # Only show instructions if requested
     if not show_instructions:

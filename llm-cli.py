@@ -214,9 +214,6 @@ def repl(
     rag_manager = RAGManager()
     path_browser = PathBrowser()
 
-    # Initialize Rails code agent
-    from rails_code_agent import get_rails_agent
-    rails_agent = get_rails_agent()
     # Extract provider name from module name (e.g., "providers.azure" -> "azure")
     provider_name = provider.__name__.split('.')[-1] if hasattr(provider, '__name__') else "bedrock"
 
@@ -240,7 +237,6 @@ def repl(
     # Track UI state that persists across interactions
     thinking_mode = False
     tools_enabled = False
-    agent_enabled = False
 
     # Session recorder for persistence/export
     recorder = SessionRecorder()
@@ -254,15 +250,12 @@ def repl(
 
     while True:
         try:
-            # Sync agent state with rails_agent
-            agent_enabled = rails_agent.enabled if rails_agent else False
-
             # Get user input with usage display and history navigation
             context_status = context_manager.get_status_summary()
             display_string = f"{usage.get_display_string()} • {context_status}"
             user_input, use_thinking, thinking_mode, tools_enabled = get_multiline_input(
                 console, PROMPT_STYLE, display_string, thinking_mode,
-                conversation.get_user_history(), tools_enabled, agent_enabled, context_manager
+                conversation.get_user_history(), tools_enabled, False, context_manager
             )
 
             # Handle exit conditions
@@ -304,7 +297,7 @@ def repl(
                         continue
 
             # Handle other special commands
-            if handle_special_commands(user_input, conversation, console, context_manager, path_browser, rag_manager, rails_agent):
+            if handle_special_commands(user_input, conversation, console, context_manager, path_browser, rag_manager, None):
                 continue
 
         except (EOFError, KeyboardInterrupt):
@@ -369,56 +362,12 @@ def repl(
         # Start recorder turn
         turn_idx = recorder.start_turn(user_input, context_snapshot)
 
-        # Check if agent mode is enabled and process through ReAct agent
-        if agent_enabled and rails_agent:
-            console.print("\n[dim]🤖 Agent processing...[/dim]")
-            try:
-                import asyncio
-                from agents.react_rails_agent import ReactRailsAgent
-
-                # Initialize ReAct agent if not already done
-                if not hasattr(rails_agent, 'react_agent') or not rails_agent.react_agent:
-                    rails_agent.react_agent = ReactRailsAgent(project_root=rails_agent.project_root)
-
-                # Process message through ReAct agent
-                if isinstance(user_input, str):
-                    agent_response = asyncio.run(rails_agent.react_agent.process_message(user_input))
-                else:
-                    agent_response = "Error: Agent can only process text input"
-
-                # Create mock result object for compatibility with existing flow
-                from dataclasses import dataclass
-                from typing import List, Dict, Any
-
-                @dataclass
-                class AgentResult:
-                    text: str
-                    model_name: str = "react-agent"
-                    tokens: int = 0
-                    cost: float = 0.0
-                    tool_calls: List[Dict[str, Any]] = None
-
-                    def __post_init__(self):
-                        if self.tool_calls is None:
-                            self.tool_calls = []
-
-                result = AgentResult(text=agent_response)
-
-            except Exception as e:
-                console.print(f"[red]Agent processing error: {e}[/red]")
-                # Fallback to normal LLM processing
-                result = handle_streaming_request(
-                    session,
-                    conversation.get_sanitized_history(), use_thinking, tools_enabled,
-                    AVAILABLE_TOOLS
-                )
-        else:
-            # Send message and get response with live rendering
-            result = handle_streaming_request(
-                session,
-                conversation.get_sanitized_history(), use_thinking, tools_enabled,
-                AVAILABLE_TOOLS
-            )
+        # Send message and get response with live rendering
+        result = handle_streaming_request(
+            session,
+            conversation.get_sanitized_history(), use_thinking, tools_enabled,
+            AVAILABLE_TOOLS
+        )
 
         # Update usage tracking and record first result
         usage.update(result.tokens, result.cost)
