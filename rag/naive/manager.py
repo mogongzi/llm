@@ -3,7 +3,6 @@ from __future__ import annotations
 """RAG manager: indexing, persistence, retrieval, and context formatting."""
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -112,4 +111,3 @@ class RAGManager:
             "char_cap": self.char_cap,
             "indexed": bool(idx),
         }
-

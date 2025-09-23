@@ -1,0 +1,2575 @@
+{
+  "components": {
+    "structural": {
+      "files": [
+        {
+          "path": "app/models/product.rb",
+          "size": 729,
+          "lines": 24,
+          "type": "model",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/models/order.rb",
+          "size": 467,
+          "lines": 19,
+          "type": "model",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/models/application_record.rb",
+          "size": 78,
+          "lines": 4,
+          "type": "model",
+          "classes": 1,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "app/models/line_item.rb",
+          "size": 186,
+          "lines": 10,
+          "type": "model",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/models/cart.rb",
+          "size": 442,
+          "lines": 19,
+          "type": "model",
+          "classes": 1,
+          "methods": 2,
+          "modules": 0
+        },
+        {
+          "path": "app/models/user.rb",
+          "size": 301,
+          "lines": 15,
+          "type": "model",
+          "classes": 2,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/application_controller.rb",
+          "size": 879,
+          "lines": 33,
+          "type": "controller",
+          "classes": 1,
+          "methods": 2,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/line_items_controller.rb",
+          "size": 2219,
+          "lines": 86,
+          "type": "controller",
+          "classes": 1,
+          "methods": 9,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/carts_controller.rb",
+          "size": 2061,
+          "lines": 83,
+          "type": "controller",
+          "classes": 1,
+          "methods": 10,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/orders_controller.rb",
+          "size": 2345,
+          "lines": 90,
+          "type": "controller",
+          "classes": 1,
+          "methods": 10,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/products_controller.rb",
+          "size": 2422,
+          "lines": 90,
+          "type": "controller",
+          "classes": 1,
+          "methods": 10,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/users_controller.rb",
+          "size": 2148,
+          "lines": 82,
+          "type": "controller",
+          "classes": 1,
+          "methods": 9,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/sessions_controller.rb",
+          "size": 471,
+          "lines": 21,
+          "type": "controller",
+          "classes": 1,
+          "methods": 3,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/admin_controller.rb",
+          "size": 100,
+          "lines": 6,
+          "type": "controller",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/store_controller.rb",
+          "size": 374,
+          "lines": 15,
+          "type": "controller",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "app/controllers/concerns/current_cart.rb",
+          "size": 192,
+          "lines": 12,
+          "type": "controller",
+          "classes": 0,
+          "methods": 1,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/orders_helper.rb",
+          "size": 24,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/admin_helper.rb",
+          "size": 23,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/users_helper.rb",
+          "size": 23,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/line_items_helper.rb",
+          "size": 27,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/carts_helper.rb",
+          "size": 23,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/sessions_helper.rb",
+          "size": 26,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/store_helper.rb",
+          "size": 23,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/products_helper.rb",
+          "size": 26,
+          "lines": 3,
+          "type": "helper",
+          "classes": 0,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "app/helpers/application_helper.rb",
+          "size": 204,
+          "lines": 10,
+          "type": "helper",
+          "classes": 0,
+          "methods": 1,
+          "modules": 1
+        },
+        {
+          "path": "app/mailers/order_mailer.rb",
+          "size": 609,
+          "lines": 25,
+          "type": "mailer",
+          "classes": 1,
+          "methods": 2,
+          "modules": 0
+        },
+        {
+          "path": "app/mailers/application_mailer.rb",
+          "size": 102,
+          "lines": 5,
+          "type": "mailer",
+          "classes": 1,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "app/jobs/application_job.rb",
+          "size": 43,
+          "lines": 3,
+          "type": "job",
+          "classes": 1,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/routes.rb",
+          "size": 543,
+          "lines": 23,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/spring.rb",
+          "size": 97,
+          "lines": 7,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/environment.rb",
+          "size": 128,
+          "lines": 6,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/application.rb",
+          "size": 1159,
+          "lines": 36,
+          "type": "config",
+          "classes": 1,
+          "methods": 0,
+          "modules": 1
+        },
+        {
+          "path": "config/puma.rb",
+          "size": 1585,
+          "lines": 39,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/boot.rb",
+          "size": 207,
+          "lines": 5,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/environments/production.rb",
+          "size": 4819,
+          "lines": 107,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/environments/development.rb",
+          "size": 2076,
+          "lines": 57,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/environments/test.rb",
+          "size": 1906,
+          "lines": 49,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/application_controller_renderer.rb",
+          "size": 216,
+          "lines": 9,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/backtrace_silencers.rb",
+          "size": 404,
+          "lines": 8,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/mime_types.rb",
+          "size": 156,
+          "lines": 5,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/filter_parameter_logging.rb",
+          "size": 194,
+          "lines": 5,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/session_store.rb",
+          "size": 137,
+          "lines": 4,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/wrap_parameters.rb",
+          "size": 485,
+          "lines": 15,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/new_framework_defaults.rb",
+          "size": 965,
+          "lines": 22,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/i18n.rb",
+          "size": 119,
+          "lines": 8,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/shog.rb",
+          "size": 89,
+          "lines": 7,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/cookies_serializer.rb",
+          "size": 244,
+          "lines": 6,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/content_security_policy.rb",
+          "size": 1412,
+          "lines": 31,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/new_framework_defaults_6_0.rb",
+          "size": 2548,
+          "lines": 46,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/inflections.rb",
+          "size": 647,
+          "lines": 17,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "config/initializers/new_framework_defaults_5_2.rb",
+          "size": 1869,
+          "lines": 39,
+          "type": "config",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "db/schema.rb",
+          "size": 2241,
+          "lines": 59,
+          "type": "schema",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "db/seeds.rb",
+          "size": 992,
+          "lines": 22,
+          "type": "database",
+          "classes": 0,
+          "methods": 0,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190214065038_create_products.rb",
+          "size": 258,
+          "lines": 13,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190215081150_create_line_items.rb",
+          "size": 231,
+          "lines": 11,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "size": 136,
+          "lines": 6,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190215080557_create_carts.rb",
+          "size": 131,
+          "lines": 9,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "size": 411,
+          "lines": 11,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "size": 143,
+          "lines": 6,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "size": 346,
+          "lines": 13,
+          "type": "migration",
+          "classes": 1,
+          "methods": 2,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "size": 244,
+          "lines": 11,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190220053302_create_orders.rb",
+          "size": 224,
+          "lines": 13,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190221102659_create_users.rb",
+          "size": 184,
+          "lines": 11,
+          "type": "migration",
+          "classes": 1,
+          "methods": 1,
+          "modules": 0
+        },
+        {
+          "path": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "size": 684,
+          "lines": 29,
+          "type": "migration",
+          "classes": 1,
+          "methods": 2,
+          "modules": 0
+        }
+      ],
+      "classes": [
+        {
+          "name": "Product",
+          "file": "app/models/product.rb",
+          "line": 2,
+          "definition": "class Product < ApplicationRecord"
+        },
+        {
+          "name": "Order",
+          "file": "app/models/order.rb",
+          "line": 3,
+          "definition": "class Order < ApplicationRecord"
+        },
+        {
+          "name": "ApplicationRecord",
+          "file": "app/models/application_record.rb",
+          "line": 1,
+          "definition": "class ApplicationRecord < ActiveRecord::Base"
+        },
+        {
+          "name": "LineItem",
+          "file": "app/models/line_item.rb",
+          "line": 1,
+          "definition": "class LineItem < ApplicationRecord"
+        },
+        {
+          "name": "Cart",
+          "file": "app/models/cart.rb",
+          "line": 1,
+          "definition": "class Cart < ApplicationRecord"
+        },
+        {
+          "name": "User",
+          "file": "app/models/user.rb",
+          "line": 1,
+          "definition": "class User < ApplicationRecord"
+        },
+        {
+          "name": "Error",
+          "file": "app/models/user.rb",
+          "line": 6,
+          "definition": "class Error < StandardError"
+        },
+        {
+          "name": "ApplicationController",
+          "file": "app/controllers/application_controller.rb",
+          "line": 1,
+          "definition": "class ApplicationController < ActionController::Base"
+        },
+        {
+          "name": "LineItemsController",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 1,
+          "definition": "class LineItemsController < ApplicationController"
+        },
+        {
+          "name": "CartsController",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 1,
+          "definition": "class CartsController < ApplicationController"
+        },
+        {
+          "name": "OrdersController",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 3,
+          "definition": "class OrdersController < ApplicationController"
+        },
+        {
+          "name": "ProductsController",
+          "file": "app/controllers/products_controller.rb",
+          "line": 1,
+          "definition": "class ProductsController < ApplicationController"
+        },
+        {
+          "name": "UsersController",
+          "file": "app/controllers/users_controller.rb",
+          "line": 1,
+          "definition": "class UsersController < ApplicationController"
+        },
+        {
+          "name": "SessionsController",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 1,
+          "definition": "class SessionsController < ApplicationController"
+        },
+        {
+          "name": "AdminController",
+          "file": "app/controllers/admin_controller.rb",
+          "line": 1,
+          "definition": "class AdminController < ApplicationController"
+        },
+        {
+          "name": "StoreController",
+          "file": "app/controllers/store_controller.rb",
+          "line": 1,
+          "definition": "class StoreController < ApplicationController"
+        },
+        {
+          "name": "OrderMailer",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 1,
+          "definition": "class OrderMailer < ApplicationMailer"
+        },
+        {
+          "name": "ApplicationMailer",
+          "file": "app/mailers/application_mailer.rb",
+          "line": 1,
+          "definition": "class ApplicationMailer < ActionMailer::Base"
+        },
+        {
+          "name": "ApplicationJob",
+          "file": "app/jobs/application_job.rb",
+          "line": 1,
+          "definition": "class ApplicationJob < ActiveJob::Base"
+        },
+        {
+          "name": "Application",
+          "file": "config/application.rb",
+          "line": 19,
+          "definition": "class Application < Rails::Application"
+        },
+        {
+          "name": "CreateProducts",
+          "file": "db/migrate/20190214065038_create_products.rb",
+          "line": 1,
+          "definition": "class CreateProducts < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "CreateLineItems",
+          "file": "db/migrate/20190215081150_create_line_items.rb",
+          "line": 1,
+          "definition": "class CreateLineItems < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "AddOrderToLineItem",
+          "file": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "line": 1,
+          "definition": "class AddOrderToLineItem < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "CreateCarts",
+          "file": "db/migrate/20190215080557_create_carts.rb",
+          "line": 1,
+          "definition": "class CreateCarts < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "AddForeignKeyConstraintToActiveStorageAttachmentsForBlobId",
+          "file": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "line": 2,
+          "definition": "class AddForeignKeyConstraintToActiveStorageAttachmentsForBlobId < ActiveRecord::Migration[6.0]"
+        },
+        {
+          "name": "AddQuantityToLineItems",
+          "file": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "line": 1,
+          "definition": "class AddQuantityToLineItems < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "ChangePaytypeToEnum",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 1,
+          "definition": "class ChangePaytypeToEnum < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "AddPriceToLineItem",
+          "file": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "line": 1,
+          "definition": "class AddPriceToLineItem < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "CreateOrders",
+          "file": "db/migrate/20190220053302_create_orders.rb",
+          "line": 1,
+          "definition": "class CreateOrders < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "CreateUsers",
+          "file": "db/migrate/20190221102659_create_users.rb",
+          "line": 1,
+          "definition": "class CreateUsers < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "CombineItemsInCart",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 1,
+          "definition": "class CombineItemsInCart < ActiveRecord::Migration[5.0]"
+        }
+      ],
+      "methods": [
+        {
+          "name": "ensure_not_referenced_by_any_line_item",
+          "file": "app/models/product.rb",
+          "line": 17,
+          "is_class_method": false,
+          "definition": "def ensure_not_referenced_by_any_line_item"
+        },
+        {
+          "name": "add_line_items_from_cart",
+          "file": "app/models/order.rb",
+          "line": 12,
+          "is_class_method": false,
+          "definition": "def add_line_items_from_cart(cart)"
+        },
+        {
+          "name": "total_price",
+          "file": "app/models/line_item.rb",
+          "line": 6,
+          "is_class_method": false,
+          "definition": "def total_price"
+        },
+        {
+          "name": "add_product",
+          "file": "app/models/cart.rb",
+          "line": 4,
+          "is_class_method": false,
+          "definition": "def add_product(product)"
+        },
+        {
+          "name": "total_price",
+          "file": "app/models/cart.rb",
+          "line": 15,
+          "is_class_method": false,
+          "definition": "def total_price"
+        },
+        {
+          "name": "ensure_an_admin_remains",
+          "file": "app/models/user.rb",
+          "line": 11,
+          "is_class_method": false,
+          "definition": "def ensure_an_admin_remains"
+        },
+        {
+          "name": "authorize",
+          "file": "app/controllers/application_controller.rb",
+          "line": 9,
+          "is_class_method": false,
+          "definition": "def authorize"
+        },
+        {
+          "name": "set_i18n_locale_from_params",
+          "file": "app/controllers/application_controller.rb",
+          "line": 22,
+          "is_class_method": false,
+          "definition": "def set_i18n_locale_from_params"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 9,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "show",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 15,
+          "is_class_method": false,
+          "definition": "def show; end"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 18,
+          "is_class_method": false,
+          "definition": "def new"
+        },
+        {
+          "name": "edit",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 23,
+          "is_class_method": false,
+          "definition": "def edit; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 27,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "update",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 46,
+          "is_class_method": false,
+          "definition": "def update"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 60,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "set_line_item",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 77,
+          "is_class_method": false,
+          "definition": "def set_line_item"
+        },
+        {
+          "name": "line_item_params",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 82,
+          "is_class_method": false,
+          "definition": "def line_item_params"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 7,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "show",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 13,
+          "is_class_method": false,
+          "definition": "def show; end"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 16,
+          "is_class_method": false,
+          "definition": "def new"
+        },
+        {
+          "name": "edit",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 21,
+          "is_class_method": false,
+          "definition": "def edit; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 25,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "update",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 41,
+          "is_class_method": false,
+          "definition": "def update"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 55,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "set_cart",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 69,
+          "is_class_method": false,
+          "definition": "def set_cart"
+        },
+        {
+          "name": "cart_params",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 74,
+          "is_class_method": false,
+          "definition": "def cart_params"
+        },
+        {
+          "name": "invalid_cart",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 78,
+          "is_class_method": false,
+          "definition": "def invalid_cart"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 12,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "show",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 18,
+          "is_class_method": false,
+          "definition": "def show; end"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 21,
+          "is_class_method": false,
+          "definition": "def new"
+        },
+        {
+          "name": "edit",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 26,
+          "is_class_method": false,
+          "definition": "def edit; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 30,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "update",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 50,
+          "is_class_method": false,
+          "definition": "def update"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 64,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "set_order",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 75,
+          "is_class_method": false,
+          "definition": "def set_order"
+        },
+        {
+          "name": "order_params",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 80,
+          "is_class_method": false,
+          "definition": "def order_params"
+        },
+        {
+          "name": "ensure_cart_isnt_empty",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 84,
+          "is_class_method": false,
+          "definition": "def ensure_cart_isnt_empty"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/products_controller.rb",
+          "line": 6,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "show",
+          "file": "app/controllers/products_controller.rb",
+          "line": 12,
+          "is_class_method": false,
+          "definition": "def show; end"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/products_controller.rb",
+          "line": 15,
+          "is_class_method": false,
+          "definition": "def new"
+        },
+        {
+          "name": "edit",
+          "file": "app/controllers/products_controller.rb",
+          "line": 20,
+          "is_class_method": false,
+          "definition": "def edit; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/products_controller.rb",
+          "line": 24,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "update",
+          "file": "app/controllers/products_controller.rb",
+          "line": 40,
+          "is_class_method": false,
+          "definition": "def update"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/products_controller.rb",
+          "line": 57,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "who_bought",
+          "file": "app/controllers/products_controller.rb",
+          "line": 65,
+          "is_class_method": false,
+          "definition": "def who_bought"
+        },
+        {
+          "name": "set_product",
+          "file": "app/controllers/products_controller.rb",
+          "line": 81,
+          "is_class_method": false,
+          "definition": "def set_product"
+        },
+        {
+          "name": "product_params",
+          "file": "app/controllers/products_controller.rb",
+          "line": 86,
+          "is_class_method": false,
+          "definition": "def product_params"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/users_controller.rb",
+          "line": 6,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "show",
+          "file": "app/controllers/users_controller.rb",
+          "line": 12,
+          "is_class_method": false,
+          "definition": "def show; end"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/users_controller.rb",
+          "line": 15,
+          "is_class_method": false,
+          "definition": "def new"
+        },
+        {
+          "name": "edit",
+          "file": "app/controllers/users_controller.rb",
+          "line": 20,
+          "is_class_method": false,
+          "definition": "def edit; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/users_controller.rb",
+          "line": 24,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "update",
+          "file": "app/controllers/users_controller.rb",
+          "line": 40,
+          "is_class_method": false,
+          "definition": "def update"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/users_controller.rb",
+          "line": 58,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "set_user",
+          "file": "app/controllers/users_controller.rb",
+          "line": 73,
+          "is_class_method": false,
+          "definition": "def set_user"
+        },
+        {
+          "name": "user_params",
+          "file": "app/controllers/users_controller.rb",
+          "line": 78,
+          "is_class_method": false,
+          "definition": "def user_params"
+        },
+        {
+          "name": "new",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 4,
+          "is_class_method": false,
+          "definition": "def new; end"
+        },
+        {
+          "name": "create",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 6,
+          "is_class_method": false,
+          "definition": "def create"
+        },
+        {
+          "name": "destroy",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 16,
+          "is_class_method": false,
+          "definition": "def destroy"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/admin_controller.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "index",
+          "file": "app/controllers/store_controller.rb",
+          "line": 6,
+          "is_class_method": false,
+          "definition": "def index"
+        },
+        {
+          "name": "set_cart",
+          "file": "app/controllers/concerns/current_cart.rb",
+          "line": 5,
+          "is_class_method": false,
+          "definition": "def set_cart"
+        },
+        {
+          "name": "hidden_div_if",
+          "file": "app/helpers/application_helper.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def hidden_div_if(condition, attributes = {}, &block)"
+        },
+        {
+          "name": "received",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 8,
+          "is_class_method": false,
+          "definition": "def received(order)"
+        },
+        {
+          "name": "shipped",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 19,
+          "is_class_method": false,
+          "definition": "def shipped(order)"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190214065038_create_products.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190215081150_create_line_items.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190215080557_create_carts.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "up",
+          "file": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "line": 3,
+          "is_class_method": false,
+          "definition": "def up"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "up",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def up"
+        },
+        {
+          "name": "down",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 9,
+          "is_class_method": false,
+          "definition": "def down"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190220053302_create_orders.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "change",
+          "file": "db/migrate/20190221102659_create_users.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def change"
+        },
+        {
+          "name": "up",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 2,
+          "is_class_method": false,
+          "definition": "def up"
+        },
+        {
+          "name": "down",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 18,
+          "is_class_method": false,
+          "definition": "def down"
+        }
+      ],
+      "modules": [
+        {
+          "name": "CurrentCart",
+          "file": "app/controllers/concerns/current_cart.rb",
+          "line": 1,
+          "definition": "module CurrentCart"
+        },
+        {
+          "name": "OrdersHelper",
+          "file": "app/helpers/orders_helper.rb",
+          "line": 1,
+          "definition": "module OrdersHelper"
+        },
+        {
+          "name": "AdminHelper",
+          "file": "app/helpers/admin_helper.rb",
+          "line": 1,
+          "definition": "module AdminHelper"
+        },
+        {
+          "name": "UsersHelper",
+          "file": "app/helpers/users_helper.rb",
+          "line": 1,
+          "definition": "module UsersHelper"
+        },
+        {
+          "name": "LineItemsHelper",
+          "file": "app/helpers/line_items_helper.rb",
+          "line": 1,
+          "definition": "module LineItemsHelper"
+        },
+        {
+          "name": "CartsHelper",
+          "file": "app/helpers/carts_helper.rb",
+          "line": 1,
+          "definition": "module CartsHelper"
+        },
+        {
+          "name": "SessionsHelper",
+          "file": "app/helpers/sessions_helper.rb",
+          "line": 1,
+          "definition": "module SessionsHelper"
+        },
+        {
+          "name": "StoreHelper",
+          "file": "app/helpers/store_helper.rb",
+          "line": 1,
+          "definition": "module StoreHelper"
+        },
+        {
+          "name": "ProductsHelper",
+          "file": "app/helpers/products_helper.rb",
+          "line": 1,
+          "definition": "module ProductsHelper"
+        },
+        {
+          "name": "ApplicationHelper",
+          "file": "app/helpers/application_helper.rb",
+          "line": 1,
+          "definition": "module ApplicationHelper"
+        },
+        {
+          "name": "Depot",
+          "file": "config/application.rb",
+          "line": 18,
+          "definition": "module Depot"
+        }
+      ]
+    },
+    "symbols": {
+      "definitions": [
+        {
+          "name": "Product",
+          "kind": "class",
+          "file": "app/models/product.rb",
+          "line": 2,
+          "pattern": "class Product < ApplicationRecord"
+        },
+        {
+          "name": "ensure_not_referenced_by_any_line_item",
+          "kind": "method",
+          "file": "app/models/product.rb",
+          "line": 17,
+          "pattern": "def ensure_not_referenced_by_any_line_item"
+        },
+        {
+          "name": "Order",
+          "kind": "class",
+          "file": "app/models/order.rb",
+          "line": 3,
+          "pattern": "class Order < ApplicationRecord"
+        },
+        {
+          "name": "PAYMENT_TYPES",
+          "kind": "constant",
+          "file": "app/models/order.rb",
+          "line": 6,
+          "pattern": "PAYMENT_TYPES = ['Check', 'Credit card', 'Purchase order'].freeze"
+        },
+        {
+          "name": "add_line_items_from_cart",
+          "kind": "method",
+          "file": "app/models/order.rb",
+          "line": 12,
+          "pattern": "def add_line_items_from_cart(cart)"
+        },
+        {
+          "name": "ApplicationRecord",
+          "kind": "class",
+          "file": "app/models/application_record.rb",
+          "line": 1,
+          "pattern": "class ApplicationRecord < ActiveRecord::Base"
+        },
+        {
+          "name": "LineItem",
+          "kind": "class",
+          "file": "app/models/line_item.rb",
+          "line": 1,
+          "pattern": "class LineItem < ApplicationRecord"
+        },
+        {
+          "name": "total_price",
+          "kind": "method",
+          "file": "app/models/line_item.rb",
+          "line": 6,
+          "pattern": "def total_price"
+        },
+        {
+          "name": "Cart",
+          "kind": "class",
+          "file": "app/models/cart.rb",
+          "line": 1,
+          "pattern": "class Cart < ApplicationRecord"
+        },
+        {
+          "name": "add_product",
+          "kind": "method",
+          "file": "app/models/cart.rb",
+          "line": 4,
+          "pattern": "def add_product(product)"
+        },
+        {
+          "name": "total_price",
+          "kind": "method",
+          "file": "app/models/cart.rb",
+          "line": 15,
+          "pattern": "def total_price"
+        },
+        {
+          "name": "User",
+          "kind": "class",
+          "file": "app/models/user.rb",
+          "line": 1,
+          "pattern": "class User < ApplicationRecord"
+        },
+        {
+          "name": "Error",
+          "kind": "class",
+          "file": "app/models/user.rb",
+          "line": 6,
+          "pattern": "class Error < StandardError"
+        },
+        {
+          "name": "ensure_an_admin_remains",
+          "kind": "method",
+          "file": "app/models/user.rb",
+          "line": 11,
+          "pattern": "def ensure_an_admin_remains"
+        },
+        {
+          "name": "ApplicationController",
+          "kind": "class",
+          "file": "app/controllers/application_controller.rb",
+          "line": 1,
+          "pattern": "class ApplicationController < ActionController::Base"
+        },
+        {
+          "name": "authorize",
+          "kind": "method",
+          "file": "app/controllers/application_controller.rb",
+          "line": 9,
+          "pattern": "def authorize"
+        },
+        {
+          "name": "set_i18n_locale_from_params",
+          "kind": "method",
+          "file": "app/controllers/application_controller.rb",
+          "line": 22,
+          "pattern": "def set_i18n_locale_from_params"
+        },
+        {
+          "name": "LineItemsController",
+          "kind": "class",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 1,
+          "pattern": "class LineItemsController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 9,
+          "pattern": "def index"
+        },
+        {
+          "name": "show",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 15,
+          "pattern": "def show; end"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 18,
+          "pattern": "def new"
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 23,
+          "pattern": "def edit; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 27,
+          "pattern": "def create"
+        },
+        {
+          "name": "update",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 46,
+          "pattern": "def update"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 60,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "set_line_item",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 77,
+          "pattern": "def set_line_item"
+        },
+        {
+          "name": "line_item_params",
+          "kind": "method",
+          "file": "app/controllers/line_items_controller.rb",
+          "line": 82,
+          "pattern": "def line_item_params"
+        },
+        {
+          "name": "CartsController",
+          "kind": "class",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 1,
+          "pattern": "class CartsController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 7,
+          "pattern": "def index"
+        },
+        {
+          "name": "show",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 13,
+          "pattern": "def show; end"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 16,
+          "pattern": "def new"
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 21,
+          "pattern": "def edit; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 25,
+          "pattern": "def create"
+        },
+        {
+          "name": "update",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 41,
+          "pattern": "def update"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 55,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "set_cart",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 69,
+          "pattern": "def set_cart"
+        },
+        {
+          "name": "cart_params",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 74,
+          "pattern": "def cart_params"
+        },
+        {
+          "name": "invalid_cart",
+          "kind": "method",
+          "file": "app/controllers/carts_controller.rb",
+          "line": 78,
+          "pattern": "def invalid_cart"
+        },
+        {
+          "name": "OrdersController",
+          "kind": "class",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 3,
+          "pattern": "class OrdersController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 12,
+          "pattern": "def index"
+        },
+        {
+          "name": "show",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 18,
+          "pattern": "def show; end"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 21,
+          "pattern": "def new"
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 26,
+          "pattern": "def edit; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 30,
+          "pattern": "def create"
+        },
+        {
+          "name": "update",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 50,
+          "pattern": "def update"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 64,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "set_order",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 75,
+          "pattern": "def set_order"
+        },
+        {
+          "name": "order_params",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 80,
+          "pattern": "def order_params"
+        },
+        {
+          "name": "ensure_cart_isnt_empty",
+          "kind": "method",
+          "file": "app/controllers/orders_controller.rb",
+          "line": 84,
+          "pattern": "def ensure_cart_isnt_empty"
+        },
+        {
+          "name": "ProductsController",
+          "kind": "class",
+          "file": "app/controllers/products_controller.rb",
+          "line": 1,
+          "pattern": "class ProductsController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 6,
+          "pattern": "def index"
+        },
+        {
+          "name": "show",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 12,
+          "pattern": "def show; end"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 15,
+          "pattern": "def new"
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 20,
+          "pattern": "def edit; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 24,
+          "pattern": "def create"
+        },
+        {
+          "name": "update",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 40,
+          "pattern": "def update"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 57,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "who_bought",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 65,
+          "pattern": "def who_bought"
+        },
+        {
+          "name": "set_product",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 81,
+          "pattern": "def set_product"
+        },
+        {
+          "name": "product_params",
+          "kind": "method",
+          "file": "app/controllers/products_controller.rb",
+          "line": 86,
+          "pattern": "def product_params"
+        },
+        {
+          "name": "UsersController",
+          "kind": "class",
+          "file": "app/controllers/users_controller.rb",
+          "line": 1,
+          "pattern": "class UsersController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 6,
+          "pattern": "def index"
+        },
+        {
+          "name": "show",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 12,
+          "pattern": "def show; end"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 15,
+          "pattern": "def new"
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 20,
+          "pattern": "def edit; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 24,
+          "pattern": "def create"
+        },
+        {
+          "name": "update",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 40,
+          "pattern": "def update"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 58,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "set_user",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 73,
+          "pattern": "def set_user"
+        },
+        {
+          "name": "user_params",
+          "kind": "method",
+          "file": "app/controllers/users_controller.rb",
+          "line": 78,
+          "pattern": "def user_params"
+        },
+        {
+          "name": "SessionsController",
+          "kind": "class",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 1,
+          "pattern": "class SessionsController < ApplicationController"
+        },
+        {
+          "name": "new",
+          "kind": "method",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 4,
+          "pattern": "def new; end"
+        },
+        {
+          "name": "create",
+          "kind": "method",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 6,
+          "pattern": "def create"
+        },
+        {
+          "name": "destroy",
+          "kind": "method",
+          "file": "app/controllers/sessions_controller.rb",
+          "line": 16,
+          "pattern": "def destroy"
+        },
+        {
+          "name": "AdminController",
+          "kind": "class",
+          "file": "app/controllers/admin_controller.rb",
+          "line": 1,
+          "pattern": "class AdminController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/admin_controller.rb",
+          "line": 2,
+          "pattern": "def index"
+        },
+        {
+          "name": "StoreController",
+          "kind": "class",
+          "file": "app/controllers/store_controller.rb",
+          "line": 1,
+          "pattern": "class StoreController < ApplicationController"
+        },
+        {
+          "name": "index",
+          "kind": "method",
+          "file": "app/controllers/store_controller.rb",
+          "line": 6,
+          "pattern": "def index"
+        },
+        {
+          "name": "CurrentCart",
+          "kind": "module",
+          "file": "app/controllers/concerns/current_cart.rb",
+          "line": 1,
+          "pattern": "module CurrentCart"
+        },
+        {
+          "name": "set_cart",
+          "kind": "method",
+          "file": "app/controllers/concerns/current_cart.rb",
+          "line": 5,
+          "pattern": "def set_cart"
+        },
+        {
+          "name": "OrdersHelper",
+          "kind": "module",
+          "file": "app/helpers/orders_helper.rb",
+          "line": 1,
+          "pattern": "module OrdersHelper"
+        },
+        {
+          "name": "AdminHelper",
+          "kind": "module",
+          "file": "app/helpers/admin_helper.rb",
+          "line": 1,
+          "pattern": "module AdminHelper"
+        },
+        {
+          "name": "UsersHelper",
+          "kind": "module",
+          "file": "app/helpers/users_helper.rb",
+          "line": 1,
+          "pattern": "module UsersHelper"
+        },
+        {
+          "name": "LineItemsHelper",
+          "kind": "module",
+          "file": "app/helpers/line_items_helper.rb",
+          "line": 1,
+          "pattern": "module LineItemsHelper"
+        },
+        {
+          "name": "CartsHelper",
+          "kind": "module",
+          "file": "app/helpers/carts_helper.rb",
+          "line": 1,
+          "pattern": "module CartsHelper"
+        },
+        {
+          "name": "SessionsHelper",
+          "kind": "module",
+          "file": "app/helpers/sessions_helper.rb",
+          "line": 1,
+          "pattern": "module SessionsHelper"
+        },
+        {
+          "name": "StoreHelper",
+          "kind": "module",
+          "file": "app/helpers/store_helper.rb",
+          "line": 1,
+          "pattern": "module StoreHelper"
+        },
+        {
+          "name": "ProductsHelper",
+          "kind": "module",
+          "file": "app/helpers/products_helper.rb",
+          "line": 1,
+          "pattern": "module ProductsHelper"
+        },
+        {
+          "name": "ApplicationHelper",
+          "kind": "module",
+          "file": "app/helpers/application_helper.rb",
+          "line": 1,
+          "pattern": "module ApplicationHelper"
+        },
+        {
+          "name": "hidden_div_if",
+          "kind": "method",
+          "file": "app/helpers/application_helper.rb",
+          "line": 2,
+          "pattern": "def hidden_div_if(condition, attributes = {}, &block)"
+        },
+        {
+          "name": "OrderMailer",
+          "kind": "class",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 1,
+          "pattern": "class OrderMailer < ApplicationMailer"
+        },
+        {
+          "name": "received",
+          "kind": "method",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 8,
+          "pattern": "def received(order)"
+        },
+        {
+          "name": "shipped",
+          "kind": "method",
+          "file": "app/mailers/order_mailer.rb",
+          "line": 19,
+          "pattern": "def shipped(order)"
+        },
+        {
+          "name": "ApplicationMailer",
+          "kind": "class",
+          "file": "app/mailers/application_mailer.rb",
+          "line": 1,
+          "pattern": "class ApplicationMailer < ActionMailer::Base"
+        },
+        {
+          "name": "ApplicationJob",
+          "kind": "class",
+          "file": "app/jobs/application_job.rb",
+          "line": 1,
+          "pattern": "class ApplicationJob < ActiveJob::Base"
+        },
+        {
+          "name": "Depot",
+          "kind": "module",
+          "file": "config/application.rb",
+          "line": 18,
+          "pattern": "module Depot"
+        },
+        {
+          "name": "Application",
+          "kind": "class",
+          "file": "config/application.rb",
+          "line": 19,
+          "pattern": "class Application < Rails::Application"
+        },
+        {
+          "name": "LANGUAGES",
+          "kind": "constant",
+          "file": "config/initializers/i18n.rb",
+          "line": 3,
+          "pattern": "LANGUAGES = ["
+        },
+        {
+          "name": "CreateProducts",
+          "kind": "class",
+          "file": "db/migrate/20190214065038_create_products.rb",
+          "line": 1,
+          "pattern": "class CreateProducts < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190214065038_create_products.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "CreateLineItems",
+          "kind": "class",
+          "file": "db/migrate/20190215081150_create_line_items.rb",
+          "line": 1,
+          "pattern": "class CreateLineItems < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190215081150_create_line_items.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "AddOrderToLineItem",
+          "kind": "class",
+          "file": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "line": 1,
+          "pattern": "class AddOrderToLineItem < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "CreateCarts",
+          "kind": "class",
+          "file": "db/migrate/20190215080557_create_carts.rb",
+          "line": 1,
+          "pattern": "class CreateCarts < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190215080557_create_carts.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "AddForeignKeyConstraintToActiveStorageAttachmentsForBlobId",
+          "kind": "class",
+          "file": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "line": 2,
+          "pattern": "class AddForeignKeyConstraintToActiveStorageAttachmentsForBlobId < ActiveRecord::Migration[6.0]"
+        },
+        {
+          "name": "up",
+          "kind": "method",
+          "file": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "line": 3,
+          "pattern": "def up"
+        },
+        {
+          "name": "AddQuantityToLineItems",
+          "kind": "class",
+          "file": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "line": 1,
+          "pattern": "class AddQuantityToLineItems < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "ChangePaytypeToEnum",
+          "kind": "class",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 1,
+          "pattern": "class ChangePaytypeToEnum < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "up",
+          "kind": "method",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 2,
+          "pattern": "def up"
+        },
+        {
+          "name": "down",
+          "kind": "method",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "line": 9,
+          "pattern": "def down"
+        },
+        {
+          "name": "AddPriceToLineItem",
+          "kind": "class",
+          "file": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "line": 1,
+          "pattern": "class AddPriceToLineItem < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "CreateOrders",
+          "kind": "class",
+          "file": "db/migrate/20190220053302_create_orders.rb",
+          "line": 1,
+          "pattern": "class CreateOrders < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190220053302_create_orders.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "CreateUsers",
+          "kind": "class",
+          "file": "db/migrate/20190221102659_create_users.rb",
+          "line": 1,
+          "pattern": "class CreateUsers < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "change",
+          "kind": "method",
+          "file": "db/migrate/20190221102659_create_users.rb",
+          "line": 2,
+          "pattern": "def change"
+        },
+        {
+          "name": "CombineItemsInCart",
+          "kind": "class",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 1,
+          "pattern": "class CombineItemsInCart < ActiveRecord::Migration[5.0]"
+        },
+        {
+          "name": "up",
+          "kind": "method",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 2,
+          "pattern": "def up"
+        },
+        {
+          "name": "down",
+          "kind": "method",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "line": 18,
+          "pattern": "def down"
+        }
+      ],
+      "references": [],
+      "generated_with": "basic_regex",
+      "total_symbols": 122
+    },
+    "conventions": {
+      "models": [
+        {
+          "class_name": "Product",
+          "file": "app/models/product.rb",
+          "table_name": "products",
+          "associations": [
+            {
+              "type": "has_many",
+              "name": "line_items"
+            },
+            {
+              "type": "has_many",
+              "name": "orders"
+            }
+          ],
+          "validations": [
+            "validates :title, :description, :image_url, presence: true",
+            "validates :price, numericality: {greater_than_or_equal_to: 0.01}",
+            "validates :title, uniqueness: true, length: {minimum: 10}",
+            "validates :image_url, allow_blank: true, format: {"
+          ]
+        },
+        {
+          "class_name": "Order",
+          "file": "app/models/order.rb",
+          "table_name": "orders",
+          "associations": [
+            {
+              "type": "has_many",
+              "name": "line_items"
+            }
+          ],
+          "validations": [
+            "validates :name, :address, :email, presence: true",
+            "validates :pay_type, inclusion: PAYMENT_TYPES"
+          ]
+        },
+        {
+          "class_name": "ApplicationRecord",
+          "file": "app/models/application_record.rb",
+          "table_name": "application_records",
+          "associations": [],
+          "validations": []
+        },
+        {
+          "class_name": "LineItem",
+          "file": "app/models/line_item.rb",
+          "table_name": "line_items",
+          "associations": [
+            {
+              "type": "belongs_to",
+              "name": "order"
+            },
+            {
+              "type": "belongs_to",
+              "name": "product"
+            },
+            {
+              "type": "belongs_to",
+              "name": "cart"
+            }
+          ],
+          "validations": []
+        },
+        {
+          "class_name": "Cart",
+          "file": "app/models/cart.rb",
+          "table_name": "carts",
+          "associations": [
+            {
+              "type": "has_many",
+              "name": "line_items"
+            }
+          ],
+          "validations": []
+        },
+        {
+          "class_name": "User",
+          "file": "app/models/user.rb",
+          "table_name": "users",
+          "associations": [],
+          "validations": [
+            "validates :name, presence: true, uniqueness: true"
+          ]
+        }
+      ],
+      "controllers": [
+        {
+          "class_name": "ApplicationController",
+          "file": "app/controllers/application_controller.rb",
+          "actions": [
+            "authorize",
+            "set_i18n_locale_from_params"
+          ]
+        },
+        {
+          "class_name": "LineItemsController",
+          "file": "app/controllers/line_items_controller.rb",
+          "actions": [
+            "index",
+            "show",
+            "new",
+            "edit",
+            "create",
+            "update",
+            "destroy"
+          ]
+        },
+        {
+          "class_name": "CartsController",
+          "file": "app/controllers/carts_controller.rb",
+          "actions": [
+            "index",
+            "show",
+            "new",
+            "edit",
+            "create",
+            "update",
+            "destroy"
+          ]
+        },
+        {
+          "class_name": "OrdersController",
+          "file": "app/controllers/orders_controller.rb",
+          "actions": [
+            "index",
+            "show",
+            "new",
+            "edit",
+            "create",
+            "update",
+            "destroy"
+          ]
+        },
+        {
+          "class_name": "ProductsController",
+          "file": "app/controllers/products_controller.rb",
+          "actions": [
+            "index",
+            "show",
+            "new",
+            "edit",
+            "create",
+            "update",
+            "destroy",
+            "who_bought"
+          ]
+        },
+        {
+          "class_name": "UsersController",
+          "file": "app/controllers/users_controller.rb",
+          "actions": [
+            "index",
+            "show",
+            "new",
+            "edit",
+            "create",
+            "update",
+            "destroy"
+          ]
+        },
+        {
+          "class_name": "SessionsController",
+          "file": "app/controllers/sessions_controller.rb",
+          "actions": [
+            "new",
+            "create",
+            "destroy"
+          ]
+        },
+        {
+          "class_name": "AdminController",
+          "file": "app/controllers/admin_controller.rb",
+          "actions": [
+            "index"
+          ]
+        },
+        {
+          "class_name": "StoreController",
+          "file": "app/controllers/store_controller.rb",
+          "actions": [
+            "index"
+          ]
+        }
+      ],
+      "routes": [
+        {
+          "type": "resource",
+          "name": "users",
+          "definition": "resources :users"
+        },
+        {
+          "type": "resource",
+          "name": "products",
+          "definition": "resources :products do"
+        },
+        {
+          "type": "resource",
+          "name": "orders",
+          "definition": "resources :orders"
+        },
+        {
+          "type": "resource",
+          "name": "line_items",
+          "definition": "resources :line_items"
+        },
+        {
+          "type": "resource",
+          "name": "carts",
+          "definition": "resources :carts"
+        }
+      ],
+      "migrations": [
+        {
+          "class_name": "CreateProducts",
+          "file": "db/migrate/20190214065038_create_products.rb",
+          "table_operations": [
+            {
+              "type": "create",
+              "table": "products"
+            }
+          ]
+        },
+        {
+          "class_name": "CreateLineItems",
+          "file": "db/migrate/20190215081150_create_line_items.rb",
+          "table_operations": [
+            {
+              "type": "create",
+              "table": "line_items"
+            }
+          ]
+        },
+        {
+          "class_name": "AddOrderToLineItem",
+          "file": "db/migrate/20190220053322_add_order_to_line_item.rb",
+          "table_operations": []
+        },
+        {
+          "class_name": "CreateCarts",
+          "file": "db/migrate/20190215080557_create_carts.rb",
+          "table_operations": [
+            {
+              "type": "create",
+              "table": "carts"
+            }
+          ]
+        },
+        {
+          "class_name": "AddForeignKeyConstraintToActiveStorageAttachmentsForBlobId",
+          "file": "db/migrate/20200102090022_add_foreign_key_constraint_to_active_storage_attachments_for_blob_id.active_storage.rb",
+          "table_operations": []
+        },
+        {
+          "class_name": "AddQuantityToLineItems",
+          "file": "db/migrate/20190215102616_add_quantity_to_line_items.rb",
+          "table_operations": []
+        },
+        {
+          "class_name": "ChangePaytypeToEnum",
+          "file": "db/migrate/20190221085439_change_paytype_to_enum.rb",
+          "table_operations": []
+        },
+        {
+          "class_name": "AddPriceToLineItem",
+          "file": "db/migrate/20190215114732_add_price_to_line_item.rb",
+          "table_operations": []
+        },
+        {
+          "class_name": "CreateOrders",
+          "file": "db/migrate/20190220053302_create_orders.rb",
+          "table_operations": [
+            {
+              "type": "create",
+              "table": "orders"
+            }
+          ]
+        },
+        {
+          "class_name": "CreateUsers",
+          "file": "db/migrate/20190221102659_create_users.rb",
+          "table_operations": [
+            {
+              "type": "create",
+              "table": "users"
+            }
+          ]
+        },
+        {
+          "class_name": "CombineItemsInCart",
+          "file": "db/migrate/20190215103502_combine_items_in_cart.rb",
+          "table_operations": []
+        }
+      ],
+      "associations": [],
+      "table_mappings": {
+        "products": "Product",
+        "orders": "Order",
+        "application_records": "ApplicationRecord",
+        "line_items": "LineItem",
+        "carts": "Cart",
+        "users": "User"
+      }
+    },
+    "semantic": {
+      "embeddings": [],
+      "metadata": {
+        "model": "placeholder",
+        "dimensions": 0,
+        "total_chunks": 0
+      },
+      "status": "not_implemented"
+    }
+  },
+  "metadata": {
+    "created_at": 1758554623.9039161,
+    "build_time": 0.01679706573486328,
+    "project_root": "/Users/I503354/personal/ruby/depot",
+    "version": "1.0.0",
+    "enabled_features": {
+      "structural": true,
+      "symbols": true,
+      "conventions": true,
+      "semantic": true
+    }
+  }
+}

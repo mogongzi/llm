@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Important
 - **`util/` folder**: Contains utility functions and helper modules used internally by the project
 - **`tools/` folder**: Contains tool definitions and implementations that can be invoked by LLMs via function calling or agent workflows
+- Execute `source .venv/bin/activate` before run `python3`, `python` or `pytest` commands
 
 ## Development Commands
 
@@ -68,7 +69,9 @@ This is a streaming LLM client system with live Markdown rendering, RAG capabili
 - `render/markdown_live.py` - Live Markdown renderer using Rich library
 - `chat/` - Session and conversation management with usage tracking
 - `context/` - Context file management system
-- `rag/` - Retrieval-Augmented Generation with TF-IDF indexing
+- `rag/` - Retrieval-Augmented Generation systems
+  - `naive/` - Simple TF-IDF based RAG (original implementation)
+  - `rails_rag/` - Rails-specific code analysis RAG system
 - `tools/` - Built-in tool execution system
 - `providers/` - Provider adapters for Bedrock and Azure OpenAI
 - `debug/` - Debug clients for testing and development
@@ -96,6 +99,14 @@ This is a streaming LLM client system with live Markdown rendering, RAG capabili
 - `/rag search "query" k` - Preview search results
 - `/rag status|clear` - Inspect or clear index
 - Persistent storage in `context/.rag_index.json`
+
+**Rails Code Agent:**
+- `/agent on|off` - Enable/disable Rails code analysis agent
+- `/agent status` - Show Rails agent status and capabilities
+- `/agent analyze <query>` - Analyze SQL queries or code patterns
+- `python rails_code_agent.py --index` - Build Rails code index (standalone)
+- `python rails_code_agent.py --analyze "query"` - Analyze patterns (standalone)
+- Multi-modal code analysis with Rails convention understanding
 
 **Context Management:**
 - `/context <file>` - Add files to prompt context

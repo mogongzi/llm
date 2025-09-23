@@ -22,6 +22,11 @@ def show_help_message(console) -> None:
     console.print("  [bold green]/rag status[/bold green]          - Show index status")
     console.print("  [bold green]/rag clear[/bold green]           - Remove saved index")
     console.print()
+    console.print("[bold cyan]Rails Agent Commands:[/bold cyan]")
+    console.print("  [bold green]/agent[/bold green]        - Toggle ReAct Rails analysis agent")
+    console.print("  [bold green]/agent status[/bold green] - Show detailed agent status")
+    console.print("  [dim]Note: Use standalone rails_code_agent.py for rule-based analysis[/dim]")
+    console.print()
     console.print("[bold cyan]Session Commands:[/bold cyan]")
     console.print("  [bold green]/save[/bold green] [path]        - Save session JSON to file (default logs/sessions/<id>/session.json)")
     console.print("  [bold green]/export md[/bold green] [path]   - Export Markdown transcript (default logs/sessions/<id>/export.md)")
@@ -50,7 +55,7 @@ def show_help_message(console) -> None:
     console.print()
 
 
-def handle_special_commands(user_input: Optional[str], conversation, console=None, context_manager: Optional[ContextManager] = None, path_browser: Optional[PathBrowser] = None, rag_manager=None) -> bool:
+def handle_special_commands(user_input: Optional[str], conversation, console=None, context_manager: Optional[ContextManager] = None, path_browser: Optional[PathBrowser] = None, rag_manager=None, rails_agent=None) -> bool:
     """Handle special commands like /help, /clear, /context, @ and /exit. Returns True if command was handled."""
     if user_input == "__CLEAR__":
         conversation.clear_history()
@@ -75,6 +80,10 @@ def handle_special_commands(user_input: Optional[str], conversation, console=Non
     # Handle RAG commands
     if user_input and user_input.strip().lower().startswith("/rag"):
         return handle_rag_command(user_input.strip(), rag_manager, console)
+
+    # Handle Rails agent commands
+    if user_input and user_input.strip().lower().startswith("/agent"):
+        return handle_agent_command(user_input.strip(), rails_agent, console)
 
     if user_input is None:
         return True  # Command handled or empty input
@@ -277,4 +286,57 @@ def handle_rag_command(user_input: str, rag_manager, console) -> bool:
         return True
 
     console.print("[yellow]Unknown /rag command[/yellow]")
+    return True
+
+
+def handle_agent_command(user_input: str, rails_agent, console) -> bool:
+    """Handle /agent commands for ReAct Rails analysis agent.
+
+    Supported:
+      /agent        - Toggle agent on/off
+      /agent status - Show detailed agent status
+    """
+    if not rails_agent:
+        if console:
+            console.print("[red]Rails agent not available[/red]")
+        return True
+
+    parts = user_input.split()
+
+    # Handle /agent status
+    if len(parts) > 1 and parts[1].lower() == "status":
+        # Show detailed agent status
+        status = rails_agent.status()
+        console.print(f"[cyan]Rails Agent[/cyan]: enabled={status['enabled']}")
+        console.print(f"  Project: {status['project_root']}")
+
+        # Show tool availability
+        tools = status.get('tools', {})
+        available_tools = [name for name, available in tools.items() if available]
+        console.print(f"  Tools: {', '.join(available_tools) if available_tools else 'none available'}")
+
+        # Show Rails paths
+        paths = status.get('rails_paths', {})
+        valid_paths = [name for name, exists in paths.items() if exists]
+        console.print(f"  Rails paths: {', '.join(valid_paths) if valid_paths else 'none found'}")
+
+        # Show cache status
+        cache = status.get('cache', {})
+        cached_items = [name for name, exists in cache.items() if exists]
+        console.print(f"  Cache: {', '.join(cached_items) if cached_items else 'empty'}")
+
+        return True
+
+    # Handle /agent toggle (same pattern as /think and /tools)
+    if len(parts) == 1:
+        # Toggle agent on/off
+        if rails_agent.enabled:
+            rails_agent.disable()
+            console.print("[dim]Agent mode disabled[/dim]")
+        else:
+            rails_agent.enable()
+            console.print("[green]Agent mode enabled[/green]")
+        return True
+
+    console.print("[yellow]Unknown /agent command. Use '/agent' to toggle or '/agent status' for details.[/yellow]")
     return True

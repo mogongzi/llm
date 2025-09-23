@@ -1,4 +1,4 @@
-from rag.manager import RAGManager
+from rag.naive.manager import RAGManager
 
 
 def test_rag_manager_index_search_and_format(tmp_path, monkeypatch):

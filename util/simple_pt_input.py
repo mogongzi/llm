@@ -40,6 +40,7 @@ def get_multiline_input(
     thinking_mode: bool = False,
     history: Optional[list[str]] = None,
     tools_enabled: bool = False,
+    agent_enabled: bool = False,
     context_manager=None
 ) -> tuple[Optional[str], bool, bool, bool]:
     """
@@ -60,6 +61,7 @@ def get_multiline_input(
         thinking_mode: Current thinking mode state (ON/OFF)
         history: Optional list of previous user inputs for up/down navigation
         tools_enabled: Current tools mode state (ON/OFF)
+        agent_enabled: Current ReAct agent mode state (ON/OFF)
         context_manager: Optional context manager for @ command autocompletion
 
     Returns:
@@ -77,7 +79,7 @@ def get_multiline_input(
     key_bindings = _create_key_bindings(history or [])
 
     # Show instructions with token info before prompting
-    _display_usage_instructions(console, token_info, thinking_mode, tools_enabled)
+    _display_usage_instructions(console, token_info, thinking_mode, tools_enabled, agent_enabled)
 
     try:
         user_input = _prompt_for_input(key_bindings, history, context_manager)
@@ -232,7 +234,7 @@ def _create_key_bindings(history: list[str] = None) -> KeyBindings:
     return bindings
 
 
-def _display_usage_instructions(console: Console, token_info: Optional[str] = None, thinking_mode: bool = False, tools_enabled: bool = False, show_instructions: bool = True) -> None:
+def _display_usage_instructions(console: Console, token_info: Optional[str] = None, thinking_mode: bool = False, tools_enabled: bool = False, agent_enabled: bool = False, show_instructions: bool = True) -> None:
     """
     Display usage instructions to help user understand key bindings.
 
@@ -241,6 +243,7 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
         token_info: Optional token usage string to display on the right side
         thinking_mode: Whether thinking mode is currently enabled
         tools_enabled: Whether tools mode is currently enabled
+        agent_enabled: Whether ReAct agent mode is currently enabled
         show_instructions: Whether to show the usage instructions
     """
     # Build instructions with status indicators
@@ -258,7 +261,13 @@ def _display_usage_instructions(console: Console, token_info: Optional[str] = No
     else:
         tools_part = "/tools functions"
 
-    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    Esc/Ctrl+C=cancel"
+    # Add agent mode status
+    if agent_enabled:
+        agent_part = "/agent agent [ON]"
+    else:
+        agent_part = "/agent agent"
+
+    instructions = f"{base_instructions}    {thinking_part}    {tools_part}    {agent_part}    Esc/Ctrl+C=cancel"
 
     # Only show instructions if requested
     if not show_instructions:

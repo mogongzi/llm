@@ -1,4 +1,4 @@
-from rag.indexer import NaiveIndexer
+from rag.naive.indexer import NaiveIndexer
 
 
 def test_build_index_and_search_basic(tmp_path):
