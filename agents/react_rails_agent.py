@@ -6,8 +6,8 @@ Rails codebases by reasoning about queries and orchestrating tool usage.
 """
 from __future__ import annotations
 
-import asyncio
 import json
+import re
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from rich.console import Console
@@ -15,6 +15,7 @@ from rich.console import Console
 from agents.tools.base_tool import BaseTool
 from agents.tools.ripgrep_tool import RipgrepTool
 from agents.tools.sql_rails_search import SQLRailsSearchTool
+from agents.tools.enhanced_sql_rails_search import EnhancedSQLRailsSearch
 from agents.tools.ast_grep_tool import AstGrepTool
 from agents.tools.ctags_tool import CtagsTool
 from agents.tools.model_analyzer import ModelAnalyzer
@@ -56,7 +57,7 @@ class ReactRailsAgent:
         self.react_steps: List[ReActStep] = []
         self.session = session
         self.allowed_tools = {
-            'ripgrep', 'sql_rails_search', 'ast_grep', 'ctags',
+            'ripgrep', 'sql_rails_search', 'enhanced_sql_rails_search', 'ast_grep', 'ctags',
             'model_analyzer', 'controller_analyzer', 'route_analyzer', 'migration_analyzer'
         }
         self.tool_synonyms = {
@@ -64,7 +65,9 @@ class ReactRailsAgent:
             'search_codebase': 'ripgrep',
             'code_search': 'ripgrep',
             'grep': 'ripgrep',
-            'sql_search': 'sql_rails_search',
+            'sql_search': 'enhanced_sql_rails_search',
+            'trace_sql': 'enhanced_sql_rails_search',
+            'find_sql_source': 'enhanced_sql_rails_search',
             'astgrep': 'ast_grep',
             'tags': 'ctags',
         }
@@ -80,6 +83,7 @@ class ReactRailsAgent:
         try:
             self.tools['ripgrep'] = RipgrepTool(self.project_root)
             self.tools['sql_rails_search'] = SQLRailsSearchTool(self.project_root)
+            self.tools['enhanced_sql_rails_search'] = EnhancedSQLRailsSearch(self.project_root)
             self.tools['ast_grep'] = AstGrepTool(self.project_root)
             self.tools['ctags'] = CtagsTool(self.project_root)
             self.tools['model_analyzer'] = ModelAnalyzer(self.project_root)
@@ -246,6 +250,30 @@ class ReactRailsAgent:
                     },
                     "required": []
                 }
+            },
+            {
+                "name": "enhanced_sql_rails_search",
+                "description": "Find exact Rails/ActiveRecord source code that generates a given SQL query with confidence scoring",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "Raw SQL query to trace back to Rails source code"
+                        },
+                        "include_usage_sites": {
+                            "type": "boolean",
+                            "description": "Include where the query gets executed (views, controllers)",
+                            "default": True
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of matches to return",
+                            "default": 10
+                        }
+                    },
+                    "required": ["sql"]
+                }
             }
         ]
 
@@ -284,7 +312,7 @@ class ReactRailsAgent:
             self.console.print(f"[red]{error_msg}[/red]")
             return error_msg
 
-    def _react_loop(self, user_query: str, max_steps: int = 1) -> str:
+    def _react_loop(self, user_query: str, max_steps: int = 5) -> str:
         """
         Execute the ReAct reasoning and acting loop.
 
@@ -315,61 +343,6 @@ class ReactRailsAgent:
                 # tool execution automatically. No need for text-based ReAct parsing.
                 # Just return the final response.
                 return response
-
-                # Legacy text-based ReAct parsing (not used with function calling)
-                action = self._parse_llm_response(response)
-                if action['type'] == 'thought':
-                    # Agent is reasoning (already streamed during LLM call)
-                    self.react_steps.append(ReActStep(
-                        step_type='thought',
-                        content=action['content']
-                    ))
-                    # Content was already streamed during _call_llm, no need to re-display
-                    continue
-
-                elif action['type'] == 'action':
-                    # Agent wants to use a tool
-                    tool_name = action['tool']
-                    tool_input = action['input']
-
-                    self.react_steps.append(ReActStep(
-                        step_type='action',
-                        content=f"Using {tool_name}",
-                        tool_name=tool_name,
-                        tool_input=tool_input
-                    ))
-
-                    self.console.print(f"[blue]🔧 Action:[/blue] {tool_name}({tool_input})")
-
-                    # Execute tool
-                    tool_output = self._execute_tool(tool_name, tool_input)
-
-                    # Add observation
-                    self.react_steps.append(ReActStep(
-                        step_type='observation',
-                        content=str(tool_output),
-                        tool_output=tool_output
-                    ))
-
-                    self.console.print(f"[green]👁 Observation:[/green] {str(tool_output)[:200]}...")
-
-                    # Add compact tool result summary to save tokens
-                    summary = self._summarize_tool_result(tool_name, tool_output)
-                    messages.append({"role": "user", "content": f"Tool result: {summary}"})
-
-                elif action['type'] == 'answer':
-                    # Agent has final answer
-                    self.react_steps.append(ReActStep(
-                        step_type='answer',
-                        content=action['content']
-                    ))
-
-                    self.console.print(f"[cyan]✅ Answer:[/cyan] {action['content']}")
-                    return action['content']
-
-                else:
-                    # Unknown response type, continue to next step
-                    pass
 
             except Exception as e:
                 self.console.print(f"[red]Error in ReAct step {step + 1}: {e}[/red]")
@@ -545,14 +518,17 @@ Action: migration_analyzer
 Input: {"migration_type": "all", "limit": 5}
 """
 
-        # SQL-style queries
-        if ('select' in query_lower and 'from' in query_lower) or 'where' in query_lower:
-            # Route raw SQL to the specialized tool
-            return f"""
-Thought: This looks like a raw SQL pattern. I should infer the corresponding ActiveRecord/Arel patterns and search the codebase.
+        # SQL-style queries - use enhanced tool for better structured output
+        if ('select' in query_lower and 'from' in query_lower) or 'sql' in query_lower or 'exact source code' in query_lower:
+            # Extract the actual SQL query from the user message
+            sql_match = re.search(r'SELECT\s+.*?FROM\s+.*?(?:ORDER\s+BY\s+.*?)?(?:LIMIT\s+\d+)?', user_query, re.IGNORECASE | re.DOTALL)
+            actual_sql = sql_match.group(0) if sql_match else user_query
 
-Action: sql_rails_search
-Input: {{"sql": {json.dumps(user_query)}}}
+            return f"""
+Thought: This is a SQL query tracing request. I should use the enhanced SQL search tool to find the exact Rails source code that generates this query with confidence scoring.
+
+Action: enhanced_sql_rails_search
+Input: {{"sql": {json.dumps(actual_sql)}}}
 """
 
         # Fallback generic search
