@@ -263,6 +263,7 @@ class StreamingClient:
         model_name = None
         current_tool = None
         tool_input_buffer = ""
+        pending_tool_message = None
 
         try:
             with _raw_mode(sys.stdin):
@@ -294,6 +295,11 @@ class StreamingClient:
                         text_buffer.append(event.value or "")
                         ms.add_response(event.value or "")
 
+                        # Check if we need to show a pending tool message after text streaming
+                        if pending_tool_message and event.value and event.value.strip().endswith(('.', '!', '?', ':')):
+                            console.print(pending_tool_message)
+                            pending_tool_message = None
+
 
 
                     elif event.kind == "tool_start":
@@ -302,7 +308,8 @@ class StreamingClient:
                             try:
                                 current_tool = json.loads(event.value)
                                 tool_input_buffer = ""
-                                console.print(f"[yellow]⚙ Using {current_tool.get('name')} tool...[/yellow]")
+                                # Buffer the tool message instead of printing immediately
+                                pending_tool_message = f"[yellow]⚙ Using {current_tool.get('name')} tool...[/yellow]"
                             except json.JSONDecodeError:
                                 console.print("[red]Error: Invalid tool start format[/red]")
 
@@ -311,6 +318,11 @@ class StreamingClient:
                             tool_input_buffer += event.value
 
                     elif event.kind == "tool_ready":
+                        # Show pending tool message now that we're about to execute
+                        if pending_tool_message:
+                            console.print(pending_tool_message)
+                            pending_tool_message = None
+
                         if self.tool_executor and current_tool:
                             try:
                                 tool_input = json.loads(tool_input_buffer) if tool_input_buffer else {}

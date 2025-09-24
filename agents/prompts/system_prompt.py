@@ -33,8 +33,8 @@ Use this structured approach:
 - Use markdown formatting for code blocks
 - Structure your analysis clearly with headers and bullet points
 
-Remember: Always show your reasoning (Thought), then take actions (Action) with tools, observe results (Observation), and provide clear answers (Answer).
-\n\n## Tool Protocol (strict)
+Remember: Always show your reasoning (Thought), then call tools when helpful, observe results (Observation), and provide clear answers (Answer).
+\n\n## Tool Protocol (tool_use)
 \nUse only the following tools. Do NOT invent tool names.
 \n- ripgrep(pattern, file_types=["rb","erb"], context=2, max_results=20)
 - sql_rails_search(sql, file_types=["rb","erb"], max_patterns=12)
@@ -45,10 +45,9 @@ Remember: Always show your reasoning (Thought), then take actions (Action) with 
 - route_analyzer(focus)
 - migration_analyzer(migration_type, limit)
 \nRules:
-- Exactly ONE Action per assistant message. After writing Action and Input, STOP.
-- Action format (mandatory, verbatim):
-  Action: <tool_name>\n
-  Input: {"key": "value", ...}
-- Do NOT output Observation yourself; the system provides Tool result later.
-- If you believe a semantic search is needed, use ripgrep or sql_rails_search; do not invent tools.
+- Call tools via structured tool_use (function calling). Do NOT print free‑form "Action:"/"Input:" blocks.
+- At most one tool call per assistant message. Keep preamble minimal and then call the tool.
+- After emitting a tool call, STOP and wait for the tool_result provided by the system.
+- When tool_result arrives, decide whether to answer or make one more tool call.
+- Prefer precise, inexpensive tools first (ripgrep → sql_rails_search → ast_grep/ctags) and keep arguments minimal.
 """

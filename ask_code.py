@@ -5,10 +5,8 @@ Rails Code Analysis CLI using ReAct Agent
 Dedicated tool for intelligent Rails codebase analysis using AI reasoning.
 Features advanced input handling, RAG infrastructure, and focused Rails analysis.
 """
-import asyncio
 import argparse
 import signal
-import concurrent.futures
 from typing import List, Optional
 from rich.console import Console
 from rich.text import Text
@@ -99,7 +97,7 @@ def get_agent_input(console, prompt_style, display_string, thinking_mode, user_h
         return None, False, thinking_mode, tools_enabled
 
 
-async def repl(
+def repl(
     url: str,
     *,
     provider,
@@ -182,21 +180,15 @@ async def repl(
             usage_display = usage.get_display_string()
             display_string = f"{usage_display} • Rails Code Analysis • {project_name} • {rag_status}"
 
-            # Get user input with advanced handling (run in thread pool to avoid event loop conflict)
-            loop = asyncio.get_event_loop()
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                user_input, use_thinking, thinking_mode, tools_enabled = await loop.run_in_executor(
-                    executor,
-                    lambda: get_agent_input(
-                        console,
-                        PROMPT_STYLE,
-                        display_string,
-                        thinking_mode,
-                        user_history,
-                        tools_enabled
-                    )
-                )
+            # Get user input synchronously
+            user_input, use_thinking, thinking_mode, tools_enabled = get_agent_input(
+                console,
+                PROMPT_STYLE,
+                display_string,
+                thinking_mode,
+                user_history,
+                tools_enabled,
+            )
 
             # Handle exit conditions
             if should_exit_from_input(user_input):
@@ -218,10 +210,8 @@ async def repl(
         # Process through ReAct agent
         try:
             console.print("\n[dim]🤖 Agent processing...[/dim]")
-            response = await react_agent.process_message(user_input)
-            # After live streaming completes, render the final output as Markdown for proper syntax highlighting
-            console.print("\n[cyan]Agent (final rendered):[/cyan]\n")
-            console.print(MarkdownStyled(response))
+            response = react_agent.process_message(user_input)
+            # Content was already displayed during streaming - no need to re-render
             console.print()
 
             # Note: ReAct agent handles its own LLM calls internally
@@ -233,7 +223,7 @@ async def repl(
             console.print(f"[red]Agent processing error: {e}[/red]")
 
 
-async def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point with argument parsing and signal handling."""
     parser = argparse.ArgumentParser(
         prog="ask-code",
@@ -278,7 +268,7 @@ async def main(argv: Optional[List[str]] = None) -> int:
     endpoint = args.url
     provider = get_provider(args.provider)
 
-    code = await repl(
+    code = repl(
         endpoint,
         provider=provider,
         project_root=args.project,
@@ -287,4 +277,4 @@ async def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(main())

@@ -45,6 +45,11 @@ class RipgrepTool(BaseTool):
                     "type": "integer",
                     "description": "Maximum number of results to return",
                     "default": 20
+                },
+                "case_insensitive": {
+                    "type": "boolean",
+                    "description": "Perform case-insensitive search",
+                    "default": True
                 }
             },
             "required": ["pattern"]
@@ -70,6 +75,7 @@ class RipgrepTool(BaseTool):
         file_types = input_params.get("file_types", ["rb"])
         context = input_params.get("context", 2)
         max_results = input_params.get("max_results", 20)
+        case_insensitive = bool(input_params.get("case_insensitive", True))
 
         if not pattern:
             return "Error: Pattern is required"
@@ -77,6 +83,10 @@ class RipgrepTool(BaseTool):
         try:
             # Build ripgrep command
             cmd = ["rg", "--line-number", "--with-filename"]
+
+            # Case-insensitive by default to avoid false negatives on Rails conventions
+            if case_insensitive:
+                cmd.append("-i")
 
             # Add context if specified
             if context > 0:
@@ -110,7 +120,8 @@ class RipgrepTool(BaseTool):
                 "matches": matches,
                 "total": len(matches),
                 "pattern": pattern,
-                "file_types": file_types
+                "file_types": file_types,
+                "case_insensitive": case_insensitive
             }
 
         except subprocess.TimeoutExpired:

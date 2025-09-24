@@ -116,6 +116,10 @@ class ReactRailsAgent:
                         "max_results": {
                             "type": "integer",
                             "description": "Maximum number of results to return"
+                        },
+                        "case_insensitive": {
+                            "type": "boolean",
+                            "description": "Perform case-insensitive search (default true)"
                         }
                     },
                     "required": ["pattern"]
@@ -250,7 +254,7 @@ class ReactRailsAgent:
         self.project_root = project_root
         self._init_tools()
 
-    async def process_message(self, user_query: str) -> str:
+    def process_message(self, user_query: str) -> str:
         """
         Main entry point for processing user queries using ReAct pattern.
 
@@ -268,7 +272,7 @@ class ReactRailsAgent:
             self.conversation_history.append({"role": "user", "content": user_query})
 
             # Initial reasoning
-            response = await self._react_loop(user_query)
+            response = self._react_loop(user_query)
 
             # Add agent response to history
             self.conversation_history.append({"role": "assistant", "content": response})
@@ -280,7 +284,7 @@ class ReactRailsAgent:
             self.console.print(f"[red]{error_msg}[/red]")
             return error_msg
 
-    async def _react_loop(self, user_query: str, max_steps: int = 4) -> str:
+    def _react_loop(self, user_query: str, max_steps: int = 1) -> str:
         """
         Execute the ReAct reasoning and acting loop.
 
@@ -304,20 +308,23 @@ class ReactRailsAgent:
                 # Get LLM reasoning/action with streaming display
                 response = self._call_llm(messages)
 
-                # Parse the response to determine next action
-                action = self._parse_llm_response(response)
-
                 # Always add assistant response to conversation
                 messages.append({"role": "assistant", "content": response})
 
+                # When using function calling (structured tool_use), the LLM handles
+                # tool execution automatically. No need for text-based ReAct parsing.
+                # Just return the final response.
+                return response
+
+                # Legacy text-based ReAct parsing (not used with function calling)
+                action = self._parse_llm_response(response)
                 if action['type'] == 'thought':
                     # Agent is reasoning (already streamed during LLM call)
                     self.react_steps.append(ReActStep(
                         step_type='thought',
                         content=action['content']
                     ))
-                    # Note: Thought content was already streamed during _call_llm
-                    # Continue to next step to let agent take action
+                    # Content was already streamed during _call_llm, no need to re-display
                     continue
 
                 elif action['type'] == 'action':
@@ -335,7 +342,7 @@ class ReactRailsAgent:
                     self.console.print(f"[blue]🔧 Action:[/blue] {tool_name}({tool_input})")
 
                     # Execute tool
-                    tool_output = await self._execute_tool(tool_name, tool_input)
+                    tool_output = self._execute_tool(tool_name, tool_input)
 
                     # Add observation
                     self.react_steps.append(ReActStep(
@@ -411,52 +418,31 @@ class ReactRailsAgent:
                     stop_sequences=["\nObservation:", "\nAnswer:"],
                 )
 
-                # Use live rendering for nicer streamed output while we accumulate text
-                result = self.session.streaming_client.stream_with_live_rendering(
+                # Use send_message to get complete results including tool execution
+                result = self.session.streaming_client.send_message(
                     self.session.url,
                     payload,
-                    self.session.provider.map_events,
-                    console=self.console,
-                    use_thinking=False,
+                    mapper=self.session.provider.map_events,
                     provider_name=getattr(self.session, 'provider_name', 'bedrock'),
-                    show_model_name=False,
-                    live_window=6,
                 )
 
-                # If the model called tools, send a follow-up request with tool results
+                # Display the complete message and results
+                if result.text:
+                    self.console.print(result.text.strip())
+
+                # Display tool calls and results
                 if result.tool_calls:
-                    tool_msgs = self._format_tool_messages(result.tool_calls)
-                    # Build follow-up messages (append tool_use + tool_result)
-                    followup_messages = user_messages + tool_msgs
+                    for tool_call in result.tool_calls:
+                        tool_info = tool_call.get('tool_call', {})
+                        tool_name = tool_info.get('name', 'unknown')
+                        self.console.print(f"[yellow]⚙ Using {tool_name} tool...[/yellow]")
 
-                    followup_payload = self.session.provider.build_payload(
-                        followup_messages,
-                        model=None,
-                        max_tokens=self.session.max_tokens,
-                        thinking=False,
-                        tools=self.tool_schemas,
-                        context_content=None,
-                        rag_enabled=False,
-                        system_prompt=system_prompt,
-                    )
+                        if tool_call.get('result'):
+                            result_text = tool_call.get('result', '')
+                            if isinstance(result_text, str) and result_text:
+                                self.console.print(f"[green]✓ {result_text}[/green]")
 
-                    follow = self.session.streaming_client.stream_with_live_rendering(
-                        self.session.url,
-                        followup_payload,
-                        self.session.provider.map_events,
-                        console=self.console,
-                        use_thinking=False,
-                        provider_name=getattr(self.session, 'provider_name', 'bedrock'),
-                        show_model_name=False,
-                        live_window=6,
-                    )
-                    return (follow.text or "").strip() or ""
-
-                # No tools used; return first response text
-                text = (result.text or "").strip()
-                if not text:
-                    return "Error: Incomplete or empty response from LLM."
-                return text
+                return (result.text or "").strip() or ""
             else:
                 return self._mock_llm_response(messages[-1]['content'])
 
@@ -464,6 +450,44 @@ class ReactRailsAgent:
             self.console.print(f"[red]Error calling LLM: {e}[/red]")
             # Fallback to mock
             return self._mock_llm_response(messages[-1]['content'])
+
+    def _stream_with_complete_messages(self, url, payload, mapper, provider_name):
+        """
+        Stream content but buffer complete messages before displaying.
+        This provides streaming experience without Rich Live rendering conflicts.
+        """
+        import json
+        from collections import namedtuple
+
+        # Buffer for accumulating message content
+        message_buffer = ""
+        tool_calls = []
+
+        # Use the internal _stream_events method to get raw events
+        for event in self.session.streaming_client._stream_events(url, payload, mapper):
+            if event.kind == 'text' and event.value:
+                message_buffer += event.value
+            elif event.kind == 'tool_start':
+                tool_calls.append({'tool_call': json.loads(event.value), 'result': ''})
+            elif event.kind == 'tool_ready':
+                # Tool input is complete, no action needed
+                pass
+
+        # Display the complete message immediately (no artificial delay)
+        if message_buffer:
+            self.console.print(message_buffer.strip())
+
+        # Display tool calls
+        if tool_calls:
+            for tool_call in tool_calls:
+                tool_name = tool_call.get('tool_call', {}).get('name', 'unknown')
+                self.console.print(f"[yellow]⚙ Using {tool_name} tool...[/yellow]")
+                if tool_call.get('result'):
+                    self.console.print(f"[green]✓ {tool_call.get('result')}[/green]")
+
+        # Return result object similar to send_message
+        Result = namedtuple('Result', ['text', 'tool_calls'])
+        return Result(text=message_buffer, tool_calls=tool_calls)
 
     def _mock_llm_response(self, user_query: str) -> str:
         """
@@ -605,7 +629,7 @@ Input: {"pattern": "SELECT|WHERE|FROM", "file_types": ["rb", "erb"]}
             answer_content = response.split("Answer:")[-1].strip()
             return {"type": "answer", "content": answer_content}
 
-        # Prefer the first Action block (token-saving and deterministic)
+        # Check for explicit Action block first
         act_idx = response.find("Action:")
         if act_idx != -1:
             after = response[act_idx + len("Action:") :]
@@ -644,15 +668,15 @@ Input: {"pattern": "SELECT|WHERE|FROM", "file_types": ["rb", "erb"]}
 
             return {"type": "action", "tool": tool_name, "input": tool_input}
 
-        # Thought-only content
+        # Extract thought content (everything before potential tool calls)
         if "Thought:" in response:
             thought_content = response.split("Thought:")[-1].split("Action:")[0].strip()
             return {"type": "thought", "content": thought_content}
 
-        # Default: treat whole response as thought
+        # If response contains only reasoning text, treat as thought
         return {"type": "thought", "content": response}
 
-    async def _execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
+    def _execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
         """
         Execute a tool with given input.
 
@@ -668,8 +692,40 @@ Input: {"pattern": "SELECT|WHERE|FROM", "file_types": ["rb", "erb"]}
 
         try:
             tool = self.tools[tool_name]
-            result = await tool.execute(tool_input)
-            return result
+
+            # Bridge async tool.execute into this sync method
+            import asyncio
+            try:
+                running = asyncio.get_running_loop()
+            except RuntimeError:
+                running = None
+
+            async def _run():
+                return await tool.execute(tool_input)
+
+            if running and running.is_running():
+                # Run in dedicated thread + loop
+                import threading
+                box: Dict[str, Any] = {}
+
+                def _worker():
+                    loop = asyncio.new_event_loop()
+                    try:
+                        asyncio.set_event_loop(loop)
+                        box["value"] = loop.run_until_complete(_run())
+                    finally:
+                        try:
+                            loop.close()
+                        finally:
+                            asyncio.set_event_loop(None)
+
+                t = threading.Thread(target=_worker, daemon=True)
+                t.start()
+                t.join()
+                return box.get("value")
+            else:
+                return asyncio.run(_run())
+
         except Exception as e:
             return f"Error executing {tool_name}: {e}"
 
