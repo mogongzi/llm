@@ -57,8 +57,8 @@ class AstGrepTool(BaseTool):
 
         matches: List[Dict[str, Any]] = []
 
-        # Build command; use -n to include line numbers for easy parsing
-        cmd = ["ast-grep", "-p", pattern, "-n"] + paths
+        # Build command with correct ast-grep syntax
+        cmd = ["ast-grep", "--pattern", pattern] + paths
 
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)

@@ -329,9 +329,22 @@ class ReactRailsAgent:
             {"role": "user", "content": f"Please analyze this Rails query: {user_query}"}
         ]
 
+        # New ReAct memory management system
+        react_state = {
+            'tools_used': set(),
+            'findings': [],
+            'search_attempts': [],
+            'step_results': {}
+        }
+
         for step in range(max_steps):
             try:
                 self.console.print(f"[dim]Step {step + 1}/{max_steps}[/dim]")
+
+                # Build context-aware prompt that includes memory state
+                if step > 0:
+                    context_prompt = self._build_context_prompt(react_state, step)
+                    messages.append({"role": "user", "content": context_prompt})
 
                 # Get LLM reasoning/action with streaming display
                 response = self._call_llm(messages)
@@ -339,10 +352,17 @@ class ReactRailsAgent:
                 # Always add assistant response to conversation
                 messages.append({"role": "assistant", "content": response})
 
-                # When using function calling (structured tool_use), the LLM handles
-                # tool execution automatically. No need for text-based ReAct parsing.
-                # Just return the final response.
-                return response
+                # Update ReAct state with this step's information
+                self._update_react_state(react_state, response, step)
+
+                # Check if the response looks like a final answer
+                if self._is_final_answer(response):
+                    return response
+
+                # If we've tried the same tool too many times, force a different approach
+                if self._should_force_different_tool(react_state, step):
+                    constraint_prompt = self._generate_tool_constraint_prompt(react_state)
+                    messages.append({"role": "user", "content": constraint_prompt})
 
             except Exception as e:
                 self.console.print(f"[red]Error in ReAct step {step + 1}: {e}[/red]")
@@ -351,6 +371,157 @@ class ReactRailsAgent:
         # If we reach max steps, return summary with timeout message
         self.console.print(f"[yellow]⏱️ Reached maximum steps ({max_steps}). Stopping analysis.[/yellow]")
         return self._generate_summary_with_timeout()
+
+    def _is_final_answer(self, response: str) -> bool:
+        """
+        Determine if the agent's response is a final answer or needs more steps.
+
+        Args:
+            response: The agent's response text
+
+        Returns:
+            True if this is a final answer, False if more steps are needed
+        """
+        # Be more conservative - only stop when we have clear concrete results
+        final_indicators = [
+            "I found the source code at",
+            "The exact code that generates this SQL is",
+            "Located the Rails code in",
+            "Here is the specific Rails method",
+            "Found the Rails source:",
+            "## Final Answer",
+            "## Conclusion"
+        ]
+
+        response_lower = response.lower()
+
+        # Only stop if we have very clear final answer language
+        for indicator in final_indicators:
+            if indicator.lower() in response_lower:
+                return True
+
+        # If we have concrete file paths AND code snippets, it's likely final
+        if ("app/" in response and ".rb:" in response and ("def " in response or "class " in response)):
+            return True
+
+        # If the response shows specific Rails ActiveRecord code with file locations
+        if (("app/models/" in response or "app/controllers/" in response) and
+            ("def " in response or "scope " in response or "where(" in response)):
+            return True
+
+        # Default: keep going to gather more information
+        # The agent should continue until it finds specific code locations
+        return False
+
+    def _extract_tool_used(self, response: str) -> Optional[str]:
+        """Extract which tool was used from the response."""
+        # Look for tool usage indicators in the response
+        tool_patterns = {
+            "enhanced_sql_rails_search": ["Using enhanced_sql_rails_search", "⚙ Using enhanced_sql_rails_search"],
+            "ripgrep": ["Using ripgrep", "⚙ Using ripgrep"],
+            "sql_rails_search": ["Using sql_rails_search", "⚙ Using sql_rails_search"],
+            "ast_grep": ["Using ast_grep", "⚙ Using ast_grep"],
+            "ctags": ["Using ctags", "⚙ Using ctags"],
+            "model_analyzer": ["Using model_analyzer", "⚙ Using model_analyzer"],
+            "controller_analyzer": ["Using controller_analyzer", "⚙ Using controller_analyzer"]
+        }
+
+        for tool, patterns in tool_patterns.items():
+            for pattern in patterns:
+                if pattern in response:
+                    return tool
+        return None
+
+    def _build_context_prompt(self, react_state: dict, step: int) -> str:
+        """Build context-aware prompt that includes memory of previous steps."""
+        tools_used = list(react_state['tools_used'])
+        search_attempts = react_state['search_attempts']
+
+        prompt = f"\n--- CONTEXT FROM PREVIOUS STEPS ---\n"
+        prompt += f"You are now on step {step + 1}. Previous tools used: {', '.join(tools_used)}\n"
+
+        if search_attempts:
+            prompt += f"Previous search attempts:\n"
+            for attempt in search_attempts[-3:]:  # Show last 3 attempts
+                prompt += f"- {attempt}\n"
+
+        # Progressive strategy based on step
+        if step == 1:
+            prompt += "\n🎯 NEXT STRATEGY: The SQL analysis found no direct matches. "
+            prompt += "Try ripgrep to search for window function patterns: 'SUM(', 'OVER (', 'LAG(' in .rb files."
+
+        elif step == 2:
+            prompt += "\n🎯 NEXT STRATEGY: Search in models/controllers for analytics methods. "
+            prompt += "Use model_analyzer on Product model or controller_analyzer on reporting controllers."
+
+        elif step == 3:
+            prompt += "\n🎯 NEXT STRATEGY: Search for raw SQL execution. "
+            prompt += "Use ripgrep to find 'connection.execute', 'find_by_sql', or ActiveRecord::Base patterns."
+
+        elif step == 4:
+            prompt += "\n🎯 NEXT STRATEGY: Look for custom SQL files or complex query builders. "
+            prompt += "Try ast_grep for method definitions containing 'SELECT' or search for .sql files."
+
+        prompt += f"\n🚫 DO NOT repeat tools: {', '.join(tools_used)}"
+        prompt += f"\n✅ Available unused tools: {self._get_unused_tools(react_state)}"
+        prompt += "\n--- END CONTEXT ---\n"
+
+        return prompt
+
+    def _update_react_state(self, react_state: dict, response: str, step: int):
+        """Update the ReAct state with information from this step."""
+        # Extract tool used
+        tool_used = self._extract_tool_used(response)
+        if tool_used:
+            react_state['tools_used'].add(tool_used)
+            react_state['search_attempts'].append(f"Step {step + 1}: Used {tool_used}")
+            react_state['step_results'][step] = {
+                'tool': tool_used,
+                'response': response,
+                'has_results': self._response_has_concrete_results(response)
+            }
+
+    def _should_force_different_tool(self, react_state: dict, step: int) -> bool:
+        """Check if we should force the agent to use a different tool."""
+        tools_used = react_state['tools_used']
+
+        # Force different tool if we've used the same tool multiple times
+        if len(tools_used) == 1 and step > 1:
+            return True
+
+        # Force if we're stuck in a loop
+        recent_attempts = react_state['search_attempts'][-2:]
+        if len(recent_attempts) == 2 and recent_attempts[0] == recent_attempts[1]:
+            return True
+
+        return False
+
+    def _generate_tool_constraint_prompt(self, react_state: dict) -> str:
+        """Generate a constraint prompt that forces different tool usage."""
+        tools_used = list(react_state['tools_used'])
+        unused_tools = self._get_unused_tools(react_state)
+
+        prompt = f"\n⚠️ CONSTRAINT: You have used {tools_used} multiple times without finding results.\n"
+        prompt += f"🚫 FORBIDDEN: Do NOT use these tools again: {', '.join(tools_used)}\n"
+        prompt += f"✅ REQUIRED: You MUST use one of these unused tools: {unused_tools}\n"
+        prompt += "Choose the most appropriate tool from the unused list and explain your reasoning.\n"
+
+        return prompt
+
+    def _get_unused_tools(self, react_state: dict) -> str:
+        """Get list of tools that haven't been used yet."""
+        all_tools = {
+            "enhanced_sql_rails_search", "ripgrep", "sql_rails_search",
+            "ast_grep", "ctags", "model_analyzer", "controller_analyzer",
+            "route_analyzer", "migration_analyzer"
+        }
+        used_tools = react_state['tools_used']
+        unused = sorted(all_tools - used_tools)
+        return ', '.join(unused)
+
+    def _response_has_concrete_results(self, response: str) -> bool:
+        """Check if response contains concrete file paths or code snippets."""
+        return ("app/" in response and ".rb" in response) or ("def " in response)
 
     def _call_llm(self, messages: List[Dict[str, Any]]) -> str:
         """
