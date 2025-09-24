@@ -23,8 +23,8 @@ def show_help_message(console) -> None:
     console.print("  [bold green]/rag clear[/bold green]           - Remove saved index")
     console.print()
     console.print("[bold cyan]Rails Code Analysis:[/bold cyan]")
-    console.print("  [bold green]ask_code.py[/bold green] --project <path> - Dedicated Rails analysis tool")
-    console.print("  [dim]Example: python ask_code.py --project /path/to/rails/app[/dim]")
+    console.print("  [bold green]agents/ask_code.py[/bold green] --project <path> - Dedicated Rails analysis tool")
+    console.print("  [dim]Example: python agents/ask_code.py --project /path/to/rails/app[/dim]")
     console.print("  [bold green]/tools[/bold green]          - Show agent tools and CLI availability")
     console.print()
     console.print("[bold cyan]Session Commands:[/bold cyan]")
@@ -321,5 +321,5 @@ def handle_agent_command(user_input: str, react_agent, console) -> bool:
     if console:
         console.print("[yellow]/agent commands are no longer available in llm-cli[/yellow]")
         console.print("[cyan]For Rails code analysis, use:[/cyan]")
-        console.print("[green]  python ask_code.py --project /path/to/rails/app[/green]")
+        console.print("[green]  python agents/ask_code.py --project /path/to/rails/app[/green]")
     return True
